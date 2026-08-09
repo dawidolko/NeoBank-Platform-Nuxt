@@ -1,0 +1,59 @@
+# NeoBank — production-like stack.
+#
+#   docker compose -f .tools/docker/docker-compose.prod.yml up --build -d
+#
+# Runs the multi-stage production image: no source mount, no dev deps.
+# Postgres is not published to the host — only the app can reach it.
+
+name: neobank
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-neobank_production}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-neobank_production}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  app:
+    build:
+      context: ../..
+      dockerfile: .tools/docker/Dockerfile
+      target: runtime
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-neobank_production}?schema=public&connection_limit=10
+      NUXT_SESSION_SECRET: ${NUXT_SESSION_SECRET:?NUXT_SESSION_SECRET is required}
+      NUXT_SESSION_TTL_HOURS: ${NUXT_SESSION_TTL_HOURS:-720}
+      # Demo data is opt-in in production. Set to true for a showcase deploy.
+      SEED_ON_BOOT: ${SEED_ON_BOOT:-false}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@neobank.dev}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      SEED_CUSTOMER_EMAIL: ${SEED_CUSTOMER_EMAIL:-anna.kowalska@example.com}
+      SEED_CUSTOMER_PASSWORD: ${SEED_CUSTOMER_PASSWORD:-}
+    ports:
+      - '${APP_PORT:-3000}:3000'
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+volumes:
+  postgres_data:

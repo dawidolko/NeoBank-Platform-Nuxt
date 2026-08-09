@@ -1,0 +1,60 @@
+# NeoBank — development stack.
+#
+#   docker compose -f .tools/docker/docker-compose.yml up --build
+#
+# Source is bind-mounted for hot reload; node_modules stays in a named volume
+# so the container's Linux binaries are never shadowed by the host's.
+
+name: neobank-dev
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-neobank}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neobank}
+      POSTGRES_DB: ${POSTGRES_DB:-neobank_development}
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-neobank} -d ${POSTGRES_DB:-neobank_development}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  app:
+    build:
+      context: ../..
+      dockerfile: .tools/docker/Dockerfile.dev
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://${POSTGRES_USER:-neobank}:${POSTGRES_PASSWORD:-neobank}@postgres:5432/${POSTGRES_DB:-neobank_development}?schema=public
+      NUXT_SESSION_SECRET: ${NUXT_SESSION_SECRET:-dev-secret-not-for-production}
+      NUXT_SESSION_TTL_HOURS: ${NUXT_SESSION_TTL_HOURS:-720}
+      SEED_ON_BOOT: ${SEED_ON_BOOT:-true}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@neobank.dev}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-Admin12345!}
+      SEED_CUSTOMER_EMAIL: ${SEED_CUSTOMER_EMAIL:-anna.kowalska@example.com}
+      SEED_CUSTOMER_PASSWORD: ${SEED_CUSTOMER_PASSWORD:-Customer12345!}
+      # Bind-mounted source on macOS/Windows needs polling for reliable HMR.
+      CHOKIDAR_USEPOLLING: 'true'
+    ports:
+      - '${APP_PORT:-3000}:3000'
+      - '24678:24678' # Vite HMR websocket
+    volumes:
+      - ../..:/app
+      - node_modules:/app/node_modules
+      - nuxt_cache:/app/.nuxt
+
+volumes:
+  postgres_data:
+  node_modules:
+  nuxt_cache:
