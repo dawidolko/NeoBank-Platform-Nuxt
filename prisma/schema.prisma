@@ -1,0 +1,239 @@
+// NeoBank data model.
+//
+// Money is stored as BigInt minor units (cents/grosze) — never floats.
+// Transfers are recorded double-entry: one Transfer row owns two Entry rows
+// (a debit and a credit) whose amounts always sum to zero.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum AccountType {
+  CHECKING
+  SAVINGS
+  CREDIT
+}
+
+enum AccountStatus {
+  ACTIVE
+  FROZEN
+  CLOSED
+}
+
+enum Currency {
+  PLN
+  EUR
+  USD
+  GBP
+}
+
+enum TransferType {
+  INTERNAL // between two NeoBank accounts
+  EXTERNAL // out to another bank
+  DEPOSIT // money in from outside
+  WITHDRAWAL // cash out
+}
+
+enum TransferStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REVERSED
+}
+
+enum EntryDirection {
+  DEBIT
+  CREDIT
+}
+
+enum CardType {
+  DEBIT
+  CREDIT
+}
+
+enum CardStatus {
+  ACTIVE
+  BLOCKED
+  EXPIRED
+}
+
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  phone        String?
+  role         Role       @default(CUSTOMER)
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  accounts     Account[]
+  sessions     Session[]
+  beneficiaries Beneficiary[]
+  auditLogs    AuditLog[]
+
+  @@index([role])
+  @@index([status])
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  userId    String
+  userAgent String?
+  ipAddress String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model Account {
+  id            String        @id @default(uuid())
+  iban          String        @unique
+  name          String
+  type          AccountType   @default(CHECKING)
+  status        AccountStatus @default(ACTIVE)
+  currency      Currency      @default(PLN)
+  /// Current balance in minor units. Maintained transactionally alongside entries.
+  balanceCents  BigInt        @default(0)
+  /// How far the balance may go negative (overdraft), in minor units.
+  overdraftCents BigInt       @default(0)
+  userId        String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entries  Entry[]
+  cards    Card[]
+  outgoing Transfer[] @relation("SourceAccount")
+  incoming Transfer[] @relation("DestinationAccount")
+
+  @@index([userId])
+  @@index([status])
+  @@map("accounts")
+}
+
+model Transfer {
+  id          String         @id @default(uuid())
+  reference   String         @unique
+  type        TransferType
+  status      TransferStatus @default(PENDING)
+  amountCents BigInt
+  currency    Currency
+  title       String
+  /// Set when the counterparty is outside NeoBank.
+  externalIban String?
+  externalName String?
+  failureReason String?
+
+  sourceAccountId      String?
+  destinationAccountId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sourceAccount      Account? @relation("SourceAccount", fields: [sourceAccountId], references: [id])
+  destinationAccount Account? @relation("DestinationAccount", fields: [destinationAccountId], references: [id])
+  entries            Entry[]
+
+  @@index([sourceAccountId])
+  @@index([destinationAccountId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("transfers")
+}
+
+/// One leg of a double-entry transfer. `amountCents` is signed:
+/// negative for DEBIT, positive for CREDIT.
+model Entry {
+  id           String         @id @default(uuid())
+  accountId    String
+  transferId   String
+  direction    EntryDirection
+  amountCents  BigInt
+  /// Account balance immediately after this entry was applied.
+  balanceAfterCents BigInt
+  bookedAt     DateTime       @default(now())
+
+  account  Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  transfer Transfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, bookedAt])
+  @@index([transferId])
+  @@map("entries")
+}
+
+model Beneficiary {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  iban      String
+  bankName  String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, iban])
+  @@index([userId])
+  @@map("beneficiaries")
+}
+
+model Card {
+  id         String     @id @default(uuid())
+  accountId  String
+  /// Only the last four digits are ever persisted.
+  last4      String
+  brand      String
+  type       CardType   @default(DEBIT)
+  status     CardStatus @default(ACTIVE)
+  expiryMonth Int
+  expiryYear  Int
+  createdAt  DateTime   @default(now())
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@map("cards")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}

@@ -1,0 +1,27 @@
+# Dependencies
+node_modules
+
+# Nuxt build artifacts
+.nuxt
+.output
+.nitro
+.cache
+dist
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# Testing
+coverage
+
+# Editors / OS
+.DS_Store
+.idea
+.vscode/*
+!.vscode/extensions.json
