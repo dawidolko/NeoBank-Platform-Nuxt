@@ -14,6 +14,17 @@ export default defineNuxtConfig({
   nitro: {
     // Standalone bundle so the production image can run on a bare Node runtime.
     preset: 'node-server',
+    // Money is BigInt end to end; the default es2019 target cannot emit BigInt
+    // literals and would break the ledger at runtime.
+    esbuild: {
+      options: { target: 'es2022' },
+    },
+  },
+
+  vite: {
+    build: { target: 'es2022' },
+    esbuild: { target: 'es2022' },
+    optimizeDeps: { esbuildOptions: { target: 'es2022' } },
   },
 
   runtimeConfig: {
