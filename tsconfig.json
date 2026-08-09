@@ -1,10 +1,13 @@
 {
-  "extends": "./.nuxt/tsconfig.json",
-  "compilerOptions": {
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "noImplicitOverride": true,
-    "verbatimModuleSyntax": true
-  },
-  "include": ["prisma/**/*.ts", "tests/**/*.ts"]
+  // Nuxt generates per-environment configs (app, server, shared, node).
+  // Referencing them keeps auto-imports and server globals (createError,
+  // defineEventHandler, …) resolvable instead of shadowing them with a
+  // hand-written `include`.
+  "files": [],
+  "references": [
+    { "path": "./.nuxt/tsconfig.app.json" },
+    { "path": "./.nuxt/tsconfig.server.json" },
+    { "path": "./.nuxt/tsconfig.shared.json" },
+    { "path": "./.nuxt/tsconfig.node.json" }
+  ]
 }

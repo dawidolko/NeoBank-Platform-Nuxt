@@ -1,4 +1,7 @@
 import { z } from 'zod'
+// Imported explicitly rather than relying on Nitro's auto-import: this module
+// is also loaded directly by the Vitest suites, which run outside Nitro.
+import { createError } from 'h3'
 import { isValidIban } from './iban'
 
 /** Reject the obvious throwaway passwords while keeping the rule explainable. */

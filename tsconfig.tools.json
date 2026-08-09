@@ -1,0 +1,18 @@
+{
+  // Standalone Node scripts (Prisma seed, Vitest suites) that run outside
+  // Nuxt's project graph and therefore need plain Node types.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "verbatimModuleSyntax": true
+  },
+  "include": ["prisma/**/*.ts", "tests/**/*.ts", "vitest.config.ts"]
+}
