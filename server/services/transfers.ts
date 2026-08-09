@@ -26,10 +26,69 @@ export interface TransferInput {
   externalName?: string
 }
 
-/** Human-facing reference, e.g. "NB-3F8A21C4". */
+/** Human-facing reference, e.g. 'NB-3F8A21C4'. */
 function generateReference(): string {
   return `NB-${randomBytes(4).toString('hex').toUpperCase()}`
 }
+
+/**
+ * Postgres serialization failure / deadlock — the transaction may be retried.
+ *
+ * The SQLSTATE is not always on `error.code`: Prisma surfaces a failed
+ * `$queryRaw` as P2010 and keeps the real `40001` only in the message text, so
+ * matching on the code alone silently disables every retry.
+ */
+function isRetryableConflict(error: unknown): boolean {
+  const { code, message } = (error ?? {}) as { code?: string; message?: string }
+
+  // Direct SQLSTATEs and Prisma's own transaction-conflict code.
+  if (code === '40001' || code === '40P01' || code === 'P2034') return true
+
+  // P2010 = raw query failed; the SQLSTATE is embedded in the message.
+  if (code === 'P2010' && /\b40001\b|\b40P01\b/.test(message ?? '')) return true
+
+  return /could not serialize access|deadlock detected/i.test(message ?? '')
+}
+
+/**
+ * Retry a serializable transaction that lost a write conflict.
+ *
+ * Under SERIALIZABLE, two transfers racing on the same account can abort with
+ * SQLSTATE 40001 even though neither is wrong — the correct response is to
+ * replay, not to surface a database error to the customer. Business failures
+ * (TransferError) are never retried.
+ */
+async function withSerializableRetry<T>(
+  operation: () => Promise<T>,
+  attempts = 8,
+): Promise<T> {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await operation()
+    } catch (error) {
+      if (error instanceof TransferError || !isRetryableConflict(error))
+        throw error
+
+      // Exponential backoff with full jitter. Under a burst on one account the
+      // aborts arrive together, so a fixed delay just re-synchronizes the
+      // replays into the same collision; spreading them out is what actually
+      // drains the queue. Capped so a caller never waits unboundedly.
+      if (attempt < attempts) {
+        const ceiling = Math.min(15 * 2 ** (attempt - 1), 400)
+
+        await new Promise((resolve) => setTimeout(resolve, Math.random() * ceiling))
+      }
+    }
+  }
+
+  throw new TransferError(
+    'The account was busy processing another payment. Please try again.',
+    409,
+  )
+}
+
+/** Internals exposed for unit tests only — not part of the service API. */
+export const __testing = { isRetryableConflict }
 
 /**
  * Execute a transfer.
@@ -53,115 +112,137 @@ export async function executeTransfer(input: TransferInput) {
     throw new TransferError('Recipient IBAN is not valid')
   }
 
-  return prisma.$transaction(
-    async (tx) => {
-      const source = await tx.account.findFirst({
-        where: { id: sourceAccountId, userId },
-      })
-
-      if (!source) throw new TransferError('Source account not found', 404)
-      if (source.status !== 'ACTIVE') {
-        throw new TransferError(`Source account is ${source.status.toLowerCase()}`)
-      }
-      if (source.iban === destinationIban) {
-        throw new TransferError('Cannot transfer to the same account')
-      }
-
-      const destination = await tx.account.findUnique({ where: { iban: destinationIban } })
-      const isInternal = destination !== null
-
-      if (destination && destination.status !== 'ACTIVE') {
-        throw new TransferError('Recipient account cannot accept transfers')
-      }
-      if (destination && destination.currency !== source.currency) {
-        throw new TransferError(
-          `Currency mismatch: cannot send ${source.currency} to a ${destination.currency} account`,
-        )
-      }
-
-      // Lock every touched row in a stable order to avoid deadlocks.
-      const lockIds = [source.id, destination?.id].filter((id): id is string => Boolean(id)).sort()
-
-      await tx.$queryRaw`SELECT id FROM accounts WHERE id = ANY(${lockIds}::text[]) ORDER BY id FOR UPDATE`
-
-      // Re-read post-lock: this is the balance the decision is actually made on.
-      const lockedSource = await tx.account.findUniqueOrThrow({ where: { id: source.id } })
-
-      if (!hasSufficientFunds(lockedSource.balanceCents, lockedSource.overdraftCents, amountCents)) {
-        throw new TransferError('Insufficient funds')
-      }
-
-      const type: TransferType = isInternal ? 'INTERNAL' : 'EXTERNAL'
-      const transfer = await tx.transfer.create({
-        data: {
-          reference: generateReference(),
-          type,
-          status: 'COMPLETED',
-          amountCents,
-          currency: source.currency as Currency,
-          title: title.trim(),
-          sourceAccountId: source.id,
-          destinationAccountId: destination?.id ?? null,
-          externalIban: isInternal ? null : destinationIban,
-          externalName: isInternal ? null : (input.externalName?.trim() || 'External recipient'),
-        },
-      })
-
-      // --- Debit leg ---
-      const sourceBalanceAfter = lockedSource.balanceCents - amountCents
-
-      await tx.account.update({
-        where: { id: source.id },
-        data: { balanceCents: sourceBalanceAfter },
-      })
-      await tx.entry.create({
-        data: {
-          accountId: source.id,
-          transferId: transfer.id,
-          direction: 'DEBIT',
-          amountCents: -amountCents,
-          balanceAfterCents: sourceBalanceAfter,
-        },
-      })
-
-      // --- Credit leg (only when the money stays inside NeoBank) ---
-      if (destination) {
-        const lockedDestination = await tx.account.findUniqueOrThrow({
-          where: { id: destination.id },
+  return withSerializableRetry(() =>
+    prisma.$transaction(
+      async (tx) => {
+        const source = await tx.account.findFirst({
+          where: { id: sourceAccountId, userId },
         })
-        const destinationBalanceAfter = lockedDestination.balanceCents + amountCents
+
+        if (!source) throw new TransferError('Source account not found', 404)
+        if (source.status !== 'ACTIVE') {
+          throw new TransferError(
+            `Source account is ${source.status.toLowerCase()}`,
+          )
+        }
+        if (source.iban === destinationIban) {
+          throw new TransferError('Cannot transfer to the same account')
+        }
+
+        const destination = await tx.account.findUnique({
+          where: { iban: destinationIban },
+        })
+        const isInternal = destination !== null
+
+        if (destination && destination.status !== 'ACTIVE') {
+          throw new TransferError('Recipient account cannot accept transfers')
+        }
+        if (destination && destination.currency !== source.currency) {
+          throw new TransferError(
+            `Currency mismatch: cannot send ${source.currency} to a ${destination.currency} account`,
+          )
+        }
+
+        // Lock every touched row in a stable order to avoid deadlocks.
+        const lockIds = [source.id, destination?.id]
+          .filter((id): id is string => Boolean(id))
+          .sort()
+
+        await tx.$queryRaw`SELECT id FROM accounts WHERE id = ANY(${lockIds}::text[]) ORDER BY id FOR UPDATE`
+
+        // Re-read post-lock: this is the balance the decision is actually made on.
+        const lockedSource = await tx.account.findUniqueOrThrow({
+          where: { id: source.id },
+        })
+
+        if (
+          !hasSufficientFunds(
+            lockedSource.balanceCents,
+            lockedSource.overdraftCents,
+            amountCents,
+          )
+        ) {
+          throw new TransferError('Insufficient funds')
+        }
+
+        const type: TransferType = isInternal ? 'INTERNAL' : 'EXTERNAL'
+        const transfer = await tx.transfer.create({
+          data: {
+            reference: generateReference(),
+            type,
+            status: 'COMPLETED',
+            amountCents,
+            currency: source.currency as Currency,
+            title: title.trim(),
+            sourceAccountId: source.id,
+            destinationAccountId: destination?.id ?? null,
+            externalIban: isInternal ? null : destinationIban,
+            externalName: isInternal
+              ? null
+              : input.externalName?.trim() || 'External recipient',
+          },
+        })
+
+        // --- Debit leg ---
+        const sourceBalanceAfter = lockedSource.balanceCents - amountCents
 
         await tx.account.update({
-          where: { id: destination.id },
-          data: { balanceCents: destinationBalanceAfter },
+          where: { id: source.id },
+          data: { balanceCents: sourceBalanceAfter },
         })
         await tx.entry.create({
           data: {
-            accountId: destination.id,
+            accountId: source.id,
             transferId: transfer.id,
-            direction: 'CREDIT',
-            amountCents,
-            balanceAfterCents: destinationBalanceAfter,
+            direction: 'DEBIT',
+            amountCents: -amountCents,
+            balanceAfterCents: sourceBalanceAfter,
           },
         })
-      }
 
-      await recordAudit(tx, {
-        userId,
-        action: 'transfer.executed',
-        entityType: 'Transfer',
-        entityId: transfer.id,
-        metadata: {
-          reference: transfer.reference,
-          amountCents: amountCents.toString(),
-          currency: source.currency,
-          type,
-        },
-      })
+        // --- Credit leg (only when the money stays inside NeoBank) ---
+        if (destination) {
+          const lockedDestination = await tx.account.findUniqueOrThrow({
+            where: { id: destination.id },
+          })
+          const destinationBalanceAfter =
+            lockedDestination.balanceCents + amountCents
 
-      return transfer
-    },
-    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 10_000 },
+          await tx.account.update({
+            where: { id: destination.id },
+            data: { balanceCents: destinationBalanceAfter },
+          })
+          await tx.entry.create({
+            data: {
+              accountId: destination.id,
+              transferId: transfer.id,
+              direction: 'CREDIT',
+              amountCents,
+              balanceAfterCents: destinationBalanceAfter,
+            },
+          })
+        }
+
+        await recordAudit(tx, {
+          userId,
+          action: 'transfer.executed',
+          entityType: 'Transfer',
+          entityId: transfer.id,
+          metadata: {
+            reference: transfer.reference,
+            amountCents: amountCents.toString(),
+            currency: source.currency,
+            type,
+          },
+        })
+
+        return transfer
+      },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        timeout: 10_000,
+      },
+    ),
   )
 }
 
@@ -179,56 +260,67 @@ export async function executeDeposit(params: {
     throw new TransferError('Amount must be greater than zero')
   }
 
-  return prisma.$transaction(
-    async (tx) => {
-      const account = await tx.account.findFirst({
-        where: { id: params.accountId, userId: params.userId },
-      })
+  return withSerializableRetry(() =>
+    prisma.$transaction(
+      async (tx) => {
+        const account = await tx.account.findFirst({
+          where: { id: params.accountId, userId: params.userId },
+        })
 
-      if (!account) throw new TransferError('Account not found', 404)
-      if (account.status !== 'ACTIVE') throw new TransferError('Account is not active')
+        if (!account) throw new TransferError('Account not found', 404)
+        if (account.status !== 'ACTIVE')
+          throw new TransferError('Account is not active')
 
-      await tx.$queryRaw`SELECT id FROM accounts WHERE id = ${account.id} FOR UPDATE`
+        await tx.$queryRaw`SELECT id FROM accounts WHERE id = ${account.id} FOR UPDATE`
 
-      const locked = await tx.account.findUniqueOrThrow({ where: { id: account.id } })
-      const balanceAfter = locked.balanceCents + params.amountCents
+        const locked = await tx.account.findUniqueOrThrow({
+          where: { id: account.id },
+        })
+        const balanceAfter = locked.balanceCents + params.amountCents
 
-      const transfer = await tx.transfer.create({
-        data: {
-          reference: generateReference(),
-          type: 'DEPOSIT',
-          status: 'COMPLETED',
-          amountCents: params.amountCents,
-          currency: account.currency,
-          title: params.title.trim(),
-          destinationAccountId: account.id,
-        },
-      })
+        const transfer = await tx.transfer.create({
+          data: {
+            reference: generateReference(),
+            type: 'DEPOSIT',
+            status: 'COMPLETED',
+            amountCents: params.amountCents,
+            currency: account.currency,
+            title: params.title.trim(),
+            destinationAccountId: account.id,
+          },
+        })
 
-      await tx.account.update({
-        where: { id: account.id },
-        data: { balanceCents: balanceAfter },
-      })
-      await tx.entry.create({
-        data: {
-          accountId: account.id,
-          transferId: transfer.id,
-          direction: 'CREDIT',
-          amountCents: params.amountCents,
-          balanceAfterCents: balanceAfter,
-        },
-      })
+        await tx.account.update({
+          where: { id: account.id },
+          data: { balanceCents: balanceAfter },
+        })
+        await tx.entry.create({
+          data: {
+            accountId: account.id,
+            transferId: transfer.id,
+            direction: 'CREDIT',
+            amountCents: params.amountCents,
+            balanceAfterCents: balanceAfter,
+          },
+        })
 
-      await recordAudit(tx, {
-        userId: params.userId,
-        action: 'deposit.executed',
-        entityType: 'Transfer',
-        entityId: transfer.id,
-        metadata: { reference: transfer.reference, amountCents: params.amountCents.toString() },
-      })
+        await recordAudit(tx, {
+          userId: params.userId,
+          action: 'deposit.executed',
+          entityType: 'Transfer',
+          entityId: transfer.id,
+          metadata: {
+            reference: transfer.reference,
+            amountCents: params.amountCents.toString(),
+          },
+        })
 
-      return transfer
-    },
-    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 10_000 },
+        return transfer
+      },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        timeout: 10_000,
+      },
+    ),
   )
 }
