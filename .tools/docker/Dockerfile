@@ -45,8 +45,13 @@ ENV NODE_ENV=production
 RUN npx nuxt build
 
 # ---------------------------------------------------------------------------
-# Stage 3: production dependencies only
+# Stage 3: runtime dependencies only
 # ---------------------------------------------------------------------------
+# Nitro inlines every application dependency into `.output`, so the runtime does
+# NOT need the app's dependency tree. `npm ci --omit=dev` would still drag in
+# Nuxt, TypeScript, Babel and the bundlers (~500 MB) because they are runtime
+# `dependencies` at build time. Instead, install only the two tools the
+# entrypoint itself shells out to: prisma (migrate deploy) and tsx (seed).
 FROM node:${NODE_VERSION} AS prod-deps
 
 WORKDIR /app
@@ -55,13 +60,24 @@ RUN apt-get update -qq \
     && apt-get install --no-install-recommends -y openssl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-COPY package.json package-lock.json ./
 COPY prisma ./prisma
 
+# Pinned to the versions resolved in package.json to keep builds reproducible.
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --omit=dev --ignore-scripts \
+    npm init -y > /dev/null \
+    && npm install --no-audit --no-fund \
+        prisma@^6.3.1 \
+        @prisma/client@^6.3.1 \
+        tsx@^4.19.2 \
+        argon2@^0.41.1 \
     && npx prisma generate \
-    && npm cache clean --force
+    && npm cache clean --force \
+    # Strip only inert files. Do NOT prune packages here: `effect` looks like
+    # test tooling but is a real runtime dependency of @prisma/config, and
+    # removing it breaks `prisma migrate deploy` at container start.
+    && find node_modules -name '*.md' -delete \
+    && find node_modules -name '*.map' -delete \
+    && rm -rf node_modules/.cache
 
 # ---------------------------------------------------------------------------
 # Stage 4: runtime
@@ -79,16 +95,9 @@ ENV NODE_ENV=production \
     NUXT_PORT=3000 \
     PORT=3000
 
-# Prisma CLI (for `migrate deploy`) and tsx (for the seed script) must exist in
-# the runtime image — the entrypoint runs both before booting the server.
+# Only the entrypoint's own tooling (prisma migrate + tsx seed). The server
+# itself runs entirely from the self-contained Nitro bundle in .output.
 COPY --from=prod-deps /app/node_modules ./node_modules
-COPY --from=build /app/node_modules/prisma ./node_modules/prisma
-COPY --from=build /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
-COPY --from=build /app/node_modules/tsx ./node_modules/tsx
-COPY --from=build /app/node_modules/.bin/tsx ./node_modules/.bin/tsx
-COPY --from=build /app/node_modules/esbuild ./node_modules/esbuild
-COPY --from=build /app/node_modules/get-tsconfig ./node_modules/get-tsconfig
-COPY --from=build /app/node_modules/resolve-pkg-maps ./node_modules/resolve-pkg-maps
 
 COPY --from=build /app/.output ./.output
 COPY package.json ./
