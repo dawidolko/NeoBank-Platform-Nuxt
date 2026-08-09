@@ -38,7 +38,7 @@ const features = [
           <span>NeoBank</span>
         </span>
         <nav class="row">
-          <NuxtLink v-if="isAuthenticated" to="/dashboard" class="btn btn-sm">Open banking</NuxtLink>
+          <NuxtLink v-if="isAuthenticated" to="/dashboard" class="btn btn-sm">Go to dashboard</NuxtLink>
           <template v-else>
             <NuxtLink to="/login" class="btn btn-ghost btn-sm">Sign in</NuxtLink>
             <NuxtLink to="/register" class="btn btn-sm">Open an account</NuxtLink>
