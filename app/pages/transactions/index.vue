@@ -4,20 +4,20 @@ useHead({ title: 'Transactions — NeoBank' })
 const route = useRoute()
 const router = useRouter()
 const { signedMoney, dateTime, maskIban } = useFormat()
+const { forEntry } = useCounterparty()
 
 const { data: accountData } = await useFetch('/api/accounts', { headers: useApiHeaders() })
 const accounts = computed(() => accountData.value?.accounts ?? [])
 
 const filters = reactive({
   accountId: (route.query.accountId as string) ?? '',
-  type: '',
-  search: '',
-  from: '',
-  to: '',
-  page: 1,
+  type: (route.query.type as string) ?? '',
+  search: (route.query.search as string) ?? '',
+  from: (route.query.from as string) ?? '',
+  to: (route.query.to as string) ?? '',
+  page: Number(route.query.page) || 1,
 })
 
-// Only send filters that are actually set — empty strings would fail validation.
 const query = computed(() => {
   const params: Record<string, string | number> = { page: filters.page, perPage: 20 }
 
@@ -30,24 +30,30 @@ const query = computed(() => {
   return params
 })
 
-const { data, pending } = await useFetch('/api/transactions', { query, headers: useApiHeaders() })
+const { data, pending } = await useFetch('/api/transactions', {
+  query,
+  headers: useApiHeaders(),
+})
 
 const transactions = computed(() => data.value?.transactions ?? [])
 const pagination = computed(() => data.value?.pagination)
 
-// Any filter change resets to the first page, otherwise page 3 of a new filter 404s visually.
 watch(
   () => [filters.accountId, filters.type, filters.search, filters.from, filters.to],
   () => { filters.page = 1 },
 )
 
-// Keep the account filter shareable in the URL.
-watch(
-  () => filters.accountId,
-  (accountId) => {
-    router.replace({ query: accountId ? { accountId } : {} })
-  },
-)
+// Mirror the full filter set into the URL so a filtered statement is shareable.
+watch(query, (params) => {
+  const clean: Record<string, string> = {}
+
+  for (const [key, value] of Object.entries(params)) {
+    if (key === 'perPage' || (key === 'page' && value === 1)) continue
+    clean[key] = String(value)
+  }
+
+  router.replace({ query: clean })
+})
 
 function resetFilters() {
   filters.accountId = ''
@@ -62,19 +68,17 @@ const hasFilters = computed(
   () => Boolean(filters.accountId || filters.type || filters.search || filters.from || filters.to),
 )
 
-function counterpartyOf(entry: (typeof transactions.value)[number]): string {
-  const transfer = entry.transfer
+const exportUrl = computed(() => {
+  const params = new URLSearchParams()
 
-  if (transfer.externalName) return transfer.externalName
+  if (filters.accountId) params.set('accountId', filters.accountId)
+  if (filters.from) params.set('from', filters.from)
+  if (filters.to) params.set('to', filters.to)
 
-  const isCredit = entry.direction === 'CREDIT'
-  const other = isCredit ? transfer.sourceAccount : transfer.destinationAccount
+  const qs = params.toString()
 
-  if (other?.user) return `${other.user.firstName} ${other.user.lastName}`
-  if (transfer.type === 'DEPOSIT') return 'Incoming payment'
-
-  return '—'
-}
+  return `/api/transactions/export${qs ? `?${qs}` : ''}`
+})
 </script>
 
 <template>
@@ -84,51 +88,51 @@ function counterpartyOf(entry: (typeof transactions.value)[number]): string {
         <h1>Transactions</h1>
         <p class="muted small">Every entry across your accounts.</p>
       </div>
-      <NuxtLink to="/transfer" class="btn btn-sm">Send money</NuxtLink>
+      <div class="row">
+        <a class="btn btn-secondary btn-sm" :href="exportUrl" download>Export CSV</a>
+        <NuxtLink to="/transfer" class="btn btn-sm">Send money</NuxtLink>
+      </div>
     </div>
 
     <section class="card">
+      <h2 class="visually-hidden">Filters</h2>
       <div class="filters">
-        <div class="field">
-          <label class="field-label" for="filter-account">Account</label>
-          <select id="filter-account" v-model="filters.accountId" class="select">
+        <FormField v-slot="field" label="Account">
+          <select :id="field.id" v-model="filters.accountId" class="select">
             <option value="">All accounts</option>
             <option v-for="account in accounts" :key="account.id" :value="account.id">
               {{ account.name }}
             </option>
           </select>
-        </div>
+        </FormField>
 
-        <div class="field">
-          <label class="field-label" for="filter-type">Type</label>
-          <select id="filter-type" v-model="filters.type" class="select">
+        <FormField v-slot="field" label="Type">
+          <select :id="field.id" v-model="filters.type" class="select">
             <option value="">All types</option>
             <option value="INTERNAL">Internal</option>
             <option value="EXTERNAL">External</option>
             <option value="DEPOSIT">Deposit</option>
             <option value="WITHDRAWAL">Withdrawal</option>
           </select>
-        </div>
+        </FormField>
 
-        <div class="field">
-          <label class="field-label" for="filter-from">From</label>
-          <input id="filter-from" v-model="filters.from" class="input" type="date">
-        </div>
+        <FormField v-slot="field" label="From">
+          <input :id="field.id" v-model="filters.from" class="input" type="date">
+        </FormField>
 
-        <div class="field">
-          <label class="field-label" for="filter-to">To</label>
-          <input id="filter-to" v-model="filters.to" class="input" type="date">
-        </div>
+        <FormField v-slot="field" label="To">
+          <input :id="field.id" v-model="filters.to" class="input" type="date">
+        </FormField>
 
-        <div class="field filter-search">
-          <label class="field-label" for="filter-search">Search</label>
+        <FormField v-slot="field" label="Search" class="filter-search">
           <input
-            id="filter-search"
+            :id="field.id"
             v-model.lazy="filters.search"
             class="input"
+            type="search"
             placeholder="Title, reference or recipient"
           >
-        </div>
+        </FormField>
 
         <div class="field filter-reset">
           <button
@@ -144,32 +148,37 @@ function counterpartyOf(entry: (typeof transactions.value)[number]): string {
     </section>
 
     <section class="card">
-      <div v-if="pending" class="empty">Loading transactions…</div>
+      <SkeletonBlock v-if="pending" :rows="8" height="34px" />
 
       <template v-else-if="transactions.length">
-        <div class="table-wrap">
+        <div class="table-wrap" tabindex="0" role="region" aria-label="Transactions table">
           <table class="table">
+            <caption class="visually-hidden">
+              Your transactions, newest first
+            </caption>
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Description</th>
-                <th>Counterparty</th>
-                <th>Account</th>
-                <th>Type</th>
-                <th>Status</th>
-                <th class="align-right">Amount</th>
-                <th class="align-right">Balance</th>
+                <th scope="col">Date</th>
+                <th scope="col">Description</th>
+                <th scope="col">Counterparty</th>
+                <th scope="col">Account</th>
+                <th scope="col">Type</th>
+                <th scope="col">Status</th>
+                <th scope="col" class="align-right">Amount</th>
+                <th scope="col" class="align-right">Balance</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="entry in transactions" :key="entry.id">
                 <td class="tiny muted">{{ dateTime(entry.bookedAt) }}</td>
                 <td>
-                  <div class="cell-title truncate">{{ entry.transfer.title }}</div>
+                  <NuxtLink :to="`/transactions/${entry.id}`" class="cell-title truncate">
+                    {{ entry.transfer.title }}
+                  </NuxtLink>
                   <div class="tiny muted mono">{{ entry.transfer.reference }}</div>
                 </td>
                 <td>
-                  <div class="truncate">{{ counterpartyOf(entry) }}</div>
+                  <div class="truncate">{{ forEntry(entry.transfer, entry.direction) }}</div>
                   <div v-if="entry.transfer.externalIban" class="tiny muted mono">
                     {{ maskIban(entry.transfer.externalIban) }}
                   </div>
@@ -190,35 +199,32 @@ function counterpartyOf(entry: (typeof transactions.value)[number]): string {
           </table>
         </div>
 
-        <div v-if="pagination && pagination.pages > 1" class="pagination">
-          <button
-            class="btn btn-secondary btn-sm"
-            type="button"
-            :disabled="filters.page <= 1"
-            @click="filters.page -= 1"
-          >
-            Previous
-          </button>
-          <span class="small muted">
-            Page {{ pagination.page }} of {{ pagination.pages }} · {{ pagination.total }} entries
-          </span>
-          <button
-            class="btn btn-secondary btn-sm"
-            type="button"
-            :disabled="filters.page >= pagination.pages"
-            @click="filters.page += 1"
-          >
-            Next
-          </button>
-        </div>
+        <AppPagination
+          v-if="pagination"
+          :page="pagination.page"
+          :pages="pagination.pages"
+          :total="pagination.total"
+          label="transactions"
+          @update:page="filters.page = $event"
+        />
       </template>
 
       <EmptyState
         v-else
         icon="🔍"
         title="No transactions found"
-        :description="hasFilters ? 'Try widening your filters.' : 'Activity will appear here once money moves.'"
-      />
+        :description="
+          hasFilters
+            ? 'Try widening your filters or clearing them.'
+            : 'Activity will appear here once money moves.'
+        "
+      >
+        <template v-if="hasFilters" #action>
+          <button class="btn btn-secondary btn-sm" type="button" @click="resetFilters">
+            Clear filters
+          </button>
+        </template>
+      </EmptyState>
     </section>
   </div>
 </template>
@@ -233,18 +239,8 @@ function counterpartyOf(entry: (typeof transactions.value)[number]): string {
 
 .filter-search { grid-column: span 2; }
 .filter-reset { justify-content: flex-end; }
-.cell-title { font-weight: 570; max-width: 220px; }
-
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding-top: 15px;
-  margin-top: 6px;
-  border-top: 1px solid var(--border);
-  flex-wrap: wrap;
-}
+.cell-title { font-weight: 570; max-width: 220px; display: block; color: inherit; }
+.cell-title:hover { color: var(--primary); }
 
 @media (max-width: 700px) {
   .filter-search { grid-column: span 1; }

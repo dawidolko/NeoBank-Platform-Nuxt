@@ -105,7 +105,7 @@ const features = [
 </template>
 
 <style scoped>
-.landing { min-height: 100vh; display: flex; flex-direction: column; background: var(--bg); }
+.landing { min-height: 100dvh; display: flex; flex-direction: column; background: var(--bg); }
 
 .landing-header {
   padding: 15px 0;

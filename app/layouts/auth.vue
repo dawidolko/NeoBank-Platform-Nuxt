@@ -28,7 +28,7 @@
 
 <style scoped>
 .auth-shell {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
@@ -103,6 +103,6 @@
 @media (max-width: 900px) {
   .auth-shell { grid-template-columns: 1fr; }
   .auth-aside { display: none; }
-  .auth-panel { min-height: 100vh; }
+  .auth-panel { min-height: 100dvh; }
 }
 </style>

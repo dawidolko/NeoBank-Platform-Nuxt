@@ -1,52 +1,58 @@
 <script setup lang="ts">
-interface TransferLike {
-  reference: string
-  title: string
-  type: string
-  status: string
-  externalName?: string | null
-  externalIban?: string | null
-}
-
 interface EntryLike {
   id: string
   direction: 'DEBIT' | 'CREDIT'
   amountCents: string
   bookedAt: string
-  account?: { name: string; currency: string }
-  transfer: TransferLike
+  account?: { name?: string; currency?: string } | null
+  transfer: {
+    reference: string
+    title: string
+    type: string
+    status: string
+    externalName?: string | null
+    externalIban?: string | null
+    sourceAccount?: { name?: string; user?: { firstName: string; lastName: string } | null } | null
+    destinationAccount?: { name?: string; user?: { firstName: string; lastName: string } | null } | null
+  }
 }
 
-const props = defineProps<{ entry: EntryLike; showAccount?: boolean }>()
+const props = withDefaults(
+  defineProps<{
+    entry: EntryLike
+    showAccount?: boolean
+    /** Fallback when the entry was fetched without its account relation. */
+    currency?: string
+    to?: string
+  }>(),
+  { showAccount: false, currency: undefined, to: undefined },
+)
 
 const { signedMoney, relative } = useFormat()
+const { forEntry } = useCounterparty()
 
 const isCredit = computed(() => props.entry.direction === 'CREDIT')
-const currency = computed(() => props.entry.account?.currency ?? 'PLN')
-
-/** Who the money moved to/from, in the customer's terms. */
-const counterparty = computed(() => {
-  const { transfer } = props.entry
-
-  if (transfer.externalName) return transfer.externalName
-  if (transfer.type === 'DEPOSIT') return 'Incoming payment'
-  if (transfer.type === 'INTERNAL') return isCredit.value ? 'From your account' : 'To your account'
-
-  return 'NeoBank'
-})
+const currency = computed(() => props.entry.account?.currency ?? props.currency ?? 'PLN')
+const counterparty = computed(() => forEntry(props.entry.transfer, props.entry.direction))
 </script>
 
 <template>
-  <div class="tx-row">
-    <span class="tx-icon" :class="isCredit ? 'tx-in' : 'tx-out'">
+  <component
+    :is="to ? 'NuxtLink' : 'div'"
+    :to="to"
+    class="tx-row"
+    :class="{ 'tx-link': to }"
+  >
+    <span class="tx-icon" :class="isCredit ? 'tx-in' : 'tx-out'" aria-hidden="true">
       {{ isCredit ? '↓' : '↑' }}
     </span>
+    <span class="visually-hidden">{{ isCredit ? 'Money in' : 'Money out' }}</span>
 
     <div class="tx-body">
       <p class="tx-title truncate">{{ entry.transfer.title }}</p>
       <p class="tiny muted truncate">
         {{ counterparty }}
-        <template v-if="showAccount && entry.account"> · {{ entry.account.name }}</template>
+        <template v-if="showAccount && entry.account?.name"> · {{ entry.account.name }}</template>
         · {{ relative(entry.bookedAt) }}
       </p>
     </div>
@@ -57,7 +63,7 @@ const counterparty = computed(() => {
       </p>
       <p class="tiny muted mono">{{ entry.transfer.reference }}</p>
     </div>
-  </div>
+  </component>
 </template>
 
 <style scoped>
@@ -67,9 +73,21 @@ const counterparty = computed(() => {
   gap: 13px;
   padding: 12px 0;
   border-bottom: 1px solid var(--border);
+  color: inherit;
+  text-decoration: none;
 }
 
 .tx-row:last-child { border-bottom: none; }
+
+.tx-link { cursor: pointer; }
+
+.tx-link:hover {
+  text-decoration: none;
+  background: var(--surface-muted);
+  margin: 0 -10px;
+  padding-inline: 10px;
+  border-radius: var(--radius-sm);
+}
 
 .tx-icon {
   width: 34px;

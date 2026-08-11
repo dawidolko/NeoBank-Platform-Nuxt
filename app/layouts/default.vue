@@ -29,6 +29,8 @@ watch(() => route.fullPath, () => { menuOpen.value = false })
 
 <template>
   <div class="shell">
+    <a href="#main" class="skip-link">Skip to content</a>
+
     <header class="topbar">
       <div class="container topbar-inner">
         <NuxtLink to="/dashboard" class="brand">
@@ -36,7 +38,7 @@ watch(() => route.fullPath, () => { menuOpen.value = false })
           <span class="brand-name">NeoBank</span>
         </NuxtLink>
 
-        <nav class="nav" :class="{ 'nav-open': menuOpen }">
+        <nav id="primary-nav" class="nav" :class="{ 'nav-open': menuOpen }" aria-label="Primary">
           <NuxtLink
             v-for="link in navigation"
             :key="link.to"
@@ -49,28 +51,29 @@ watch(() => route.fullPath, () => { menuOpen.value = false })
         </nav>
 
         <div class="topbar-actions">
-          <div v-if="user" class="user-chip">
-            <span class="avatar">{{ initials }}</span>
+          <NuxtLink v-if="user" to="/profile" class="user-chip" :aria-label="`Profile and security for ${fullName}`">
+            <span class="avatar" aria-hidden="true">{{ initials }}</span>
             <span class="user-meta">
               <span class="user-name truncate">{{ fullName }}</span>
               <span class="tiny muted">{{ isAdmin ? 'Administrator' : 'Customer' }}</span>
             </span>
-          </div>
+          </NuxtLink>
           <button class="btn btn-ghost btn-sm" type="button" @click="logout()">Sign out</button>
           <button
             class="menu-toggle btn btn-ghost btn-sm"
             type="button"
             :aria-expanded="menuOpen"
+            aria-controls="primary-nav"
             aria-label="Toggle navigation"
             @click="menuOpen = !menuOpen"
           >
-            ☰
+            <span aria-hidden="true">☰</span>
           </button>
         </div>
       </div>
     </header>
 
-    <main class="main">
+    <main id="main" class="main" tabindex="-1">
       <div class="container">
         <slot />
       </div>
@@ -87,7 +90,7 @@ watch(() => route.fullPath, () => { menuOpen.value = false })
 
 <style scoped>
 .shell {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }
@@ -168,7 +171,17 @@ watch(() => route.fullPath, () => { menuOpen.value = false })
   margin-left: auto;
 }
 
-.user-chip { display: flex; align-items: center; gap: 9px; }
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 4px 7px;
+  border-radius: var(--radius-sm);
+  color: inherit;
+  text-decoration: none;
+}
+
+.user-chip:hover { background: var(--surface-muted); text-decoration: none; }
 
 .avatar {
   width: 32px;
