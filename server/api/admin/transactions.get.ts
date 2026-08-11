@@ -1,20 +1,20 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '../../utils/prisma'
 import { requireRole } from '../../utils/auth'
+import { adminTransferQuerySchema, parseOrThrow } from '../../utils/validation'
 import { serializeBigInt } from '../../utils/serialize'
 
 /** Bank-wide transfer ledger — every transfer, regardless of owner. */
 export default defineEventHandler(async (event) => {
   requireRole(event, 'ADMIN')
 
-  const query = getQuery(event)
-  const page = Math.max(1, Number(query.page) || 1)
-  const perPage = Math.min(100, Math.max(1, Number(query.perPage) || 25))
-  const search = typeof query.search === 'string' ? query.search.trim() : ''
-  const status = typeof query.status === 'string' ? query.status : ''
+  const { page, perPage, search, status } = parseOrThrow(
+    adminTransferQuerySchema,
+    getQuery(event),
+  )
 
   const where: Prisma.TransferWhereInput = {
-    ...(status ? { status: status as Prisma.EnumTransferStatusFilter['equals'] } : {}),
+    ...(status ? { status } : {}),
     ...(search
       ? {
           OR: [

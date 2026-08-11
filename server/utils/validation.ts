@@ -102,6 +102,35 @@ export const beneficiarySchema = z.object({
   bankName: z.string().trim().max(120).optional(),
 })
 
+export const adminUserQuerySchema = z.object({
+  search: z.string().trim().max(140).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  perPage: z.coerce.number().int().min(1).max(100).default(20),
+})
+
+export const adminTransferQuerySchema = z.object({
+  search: z.string().trim().max(140).optional(),
+  status: z.enum(['PENDING', 'COMPLETED', 'FAILED', 'REVERSED']).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  perPage: z.coerce.number().int().min(1).max(100).default(25),
+})
+
+export const adminAuditQuerySchema = z.object({
+  action: z.string().trim().max(80).optional(),
+  entityType: z.string().trim().max(40).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  perPage: z.coerce.number().int().min(1).max(100).default(30),
+})
+
+/** Path parameters are user input too — validate before they reach Prisma. */
+export function requireUuidParam(value: string | undefined, label = 'Resource'): string {
+  if (!value || !z.string().uuid().safeParse(value).success) {
+    throw createError({ statusCode: 404, statusMessage: `${label} not found` })
+  }
+
+  return value
+}
+
 export const transactionQuerySchema = z.object({
   accountId: z.string().uuid().optional(),
   type: z.enum(['INTERNAL', 'EXTERNAL', 'DEPOSIT', 'WITHDRAWAL']).optional(),

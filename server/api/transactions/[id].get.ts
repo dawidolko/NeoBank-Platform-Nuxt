@@ -1,11 +1,12 @@
 import { prisma } from '../../utils/prisma'
 import { requireUser } from '../../utils/auth'
+import { requireUuidParam } from '../../utils/validation'
 import { serializeBigInt } from '../../utils/serialize'
 
 /** Single ledger entry with its full transfer context. Scoped to the owner. */
 export default defineEventHandler(async (event) => {
   const user = requireUser(event)
-  const id = getRouterParam(event, 'id')
+  const id = requireUuidParam(getRouterParam(event, 'id'), 'Transaction')
 
   const entry = await prisma.entry.findFirst({
     where: { id, account: { userId: user.id } },

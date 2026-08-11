@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { Prisma, type Currency, type TransferType } from '@prisma/client'
 import { prisma } from '../utils/prisma'
-import { hasSufficientFunds } from '../utils/money'
+import { centsToDecimalString, hasSufficientFunds } from '../utils/money'
 import { isValidIban, normalizeIban } from '../utils/iban'
 import { recordAudit } from './audit'
 
@@ -14,6 +14,12 @@ export class TransferError extends Error {
     this.name = 'TransferError'
   }
 }
+
+/** Ceiling for a single self-service deposit: 1 000 000.00 in minor units. */
+export const MAX_DEPOSIT_CENTS = 100_000_000n
+
+/** Ceiling for a single outgoing transfer: 1 000 000.00 in minor units. */
+export const MAX_TRANSFER_CENTS = 100_000_000n
 
 export interface TransferInput {
   userId: string
@@ -106,6 +112,12 @@ export async function executeTransfer(input: TransferInput) {
     throw new TransferError('Amount must be greater than zero')
   }
 
+  if (amountCents > MAX_TRANSFER_CENTS) {
+    throw new TransferError(
+      `Transfers are limited to ${centsToDecimalString(MAX_TRANSFER_CENTS)} per transaction`,
+    )
+  }
+
   const destinationIban = normalizeIban(input.destinationIban)
 
   if (!isValidIban(destinationIban)) {
@@ -129,19 +141,27 @@ export async function executeTransfer(input: TransferInput) {
           throw new TransferError('Cannot transfer to the same account')
         }
 
-        const destination = await tx.account.findUnique({
+        const match = await tx.account.findUnique({
           where: { iban: destinationIban },
         })
-        const isInternal = destination !== null
 
-        if (destination && destination.status !== 'ACTIVE') {
-          throw new TransferError('Recipient account cannot accept transfers')
-        }
-        if (destination && destination.currency !== source.currency) {
+        // A destination that cannot receive the money is treated as external
+        // rather than rejected with a specific reason. Saying "that account is
+        // frozen" or "that account is in EUR" would confirm the IBAN belongs to
+        // NeoBank and disclose its state, turning transfers into an account
+        // enumeration oracle. Only the owner's own accounts get a real message.
+        const usable = match !== null && match.status === 'ACTIVE' && match.currency === source.currency
+
+        if (match && !usable && match.userId === userId) {
           throw new TransferError(
-            `Currency mismatch: cannot send ${source.currency} to a ${destination.currency} account`,
+            match.status !== 'ACTIVE'
+              ? `Your ${match.name} account is ${match.status.toLowerCase()} and cannot receive transfers`
+              : `Your ${match.name} account is in ${match.currency}; NeoBank does not convert currency`,
           )
         }
+
+        const destination = usable ? match : null
+        const isInternal = destination !== null
 
         // Lock every touched row in a stable order to avoid deadlocks.
         const lockIds = [source.id, destination?.id]
@@ -258,6 +278,14 @@ export async function executeDeposit(params: {
 }) {
   if (params.amountCents <= 0n) {
     throw new TransferError('Amount must be greater than zero')
+  }
+
+  // Deposits are self-service in this demo, so they need an explicit ceiling —
+  // otherwise any customer could mint an unbounded balance.
+  if (params.amountCents > MAX_DEPOSIT_CENTS) {
+    throw new TransferError(
+      `Deposits are limited to ${centsToDecimalString(MAX_DEPOSIT_CENTS)} per transaction`,
+    )
   }
 
   return withSerializableRetry(() =>

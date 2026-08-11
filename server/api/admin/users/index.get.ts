@@ -1,15 +1,13 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '../../../utils/prisma'
 import { requireRole } from '../../../utils/auth'
+import { adminUserQuerySchema, parseOrThrow } from '../../../utils/validation'
 import { serializeBigInt } from '../../../utils/serialize'
 
 export default defineEventHandler(async (event) => {
   requireRole(event, 'ADMIN')
 
-  const query = getQuery(event)
-  const page = Math.max(1, Number(query.page) || 1)
-  const perPage = Math.min(100, Math.max(1, Number(query.perPage) || 20))
-  const search = typeof query.search === 'string' ? query.search.trim() : ''
+  const { page, perPage, search } = parseOrThrow(adminUserQuerySchema, getQuery(event))
 
   const where: Prisma.UserWhereInput = search
     ? {

@@ -1,9 +1,10 @@
 import { prisma } from '../../utils/prisma'
 import { requireUser } from '../../utils/auth'
+import { requireUuidParam } from '../../utils/validation'
 
 export default defineEventHandler(async (event) => {
   const user = requireUser(event)
-  const id = getRouterParam(event, 'id')
+  const id = requireUuidParam(getRouterParam(event, 'id'), 'Recipient')
 
   const deleted = await prisma.beneficiary.deleteMany({ where: { id, userId: user.id } })
 

@@ -6,7 +6,7 @@ import { recordAudit } from '../../services/audit'
 
 export default defineEventHandler(async (event) => {
   const user = requireUser(event)
-  const id = getRouterParam(event, 'id')
+  const id = requireUuidParam(getRouterParam(event, 'id'), 'Account')
   const input = parseOrThrow(accountRenameSchema, await readBody(event))
 
   const existing = await prisma.account.findFirst({ where: { id, userId: user.id } })
