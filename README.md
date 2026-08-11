@@ -27,34 +27,35 @@ docker compose -f .tools/docker/docker-compose.yml up --build
 
 Open **http://localhost:3000** and sign in with either demo account:
 
-| Role         | Email                       | Password         |
-| ------------ | --------------------------- | ---------------- |
-| Customer     | `anna.kowalska@example.com` | `Customer12345!` |
-| Administrator| `admin@neobank.dev`         | `Admin12345!`    |
+| Role          | Email                       | Password         |
+| ------------- | --------------------------- | ---------------- |
+| Customer      | `anna.kowalska@example.com` | `Customer12345!` |
+| Administrator | `admin@neobank.dev`         | `Admin12345!`    |
 
-> No local Node.js or PostgreSQL installation is required — everything runs in containers.
+> No local Node.js or PostgreSQL installation is required — everything runs in
+> containers. The first request compiles the dev bundle, so give it a moment.
 
 ---
 
 ## What it does
 
-NeoBank is a working retail banking system, not a UI mock-up. Balances are derived
-from an immutable ledger, and money can only move through transactions that are
-guaranteed to balance.
+NeoBank is a working retail banking system, not a UI mock-up. Balances are
+derived from an immutable ledger, and money can only move through transactions
+that are guaranteed to balance.
 
 ### Banking core
 
-- **Multi-currency accounts** — PLN, EUR, USD and GBP, each with its own valid IBAN
-  (checksum-correct, ISO 13616 mod-97).
+- **Multi-currency accounts** — PLN, EUR, USD and GBP, each with its own valid
+  IBAN (checksum-correct, ISO 13616 mod-97).
 - **Double-entry ledger** — every internal transfer writes exactly two entries
   (a debit and a credit) whose amounts sum to zero. An account balance always
   equals the sum of its entries.
 - **Instant internal transfers** between NeoBank accounts, plus external payouts
-  to any valid IBAN.
+  to any valid IBAN. Transfers between your own accounts are one click.
 - **Overdrafts** — credit accounts may go negative up to a configured limit;
   everything else is hard-blocked at zero.
-- **Deposits** — simulated incoming payments (a real deployment would drive these
-  from a payment-rail webhook).
+- **Per-transaction ceilings** on transfers and deposits.
+- **Statement export** — download any filtered view as CSV.
 - **Cards and saved recipients** for faster repeat transfers.
 
 ### Accounts & access
@@ -62,56 +63,63 @@ guaranteed to balance.
 - Registration and sign-in with **Argon2id** password hashing (OWASP parameters).
 - **Hashed session tokens** — only a SHA-256 digest is stored, so a leaked
   database yields no usable session cookies.
+- **Rate limiting** on sign-in, registration and transfers.
+- **Profile and security page** — edit your details, change your password, and
+  review or revoke the devices you are signed in on.
 - Role-based access (`CUSTOMER` / `ADMIN`) enforced on both the API and the routes.
 - Suspending a user **revokes their live sessions**, not just future logins.
 
 ### Admin panel
 
 - Bank-wide statistics: customers, accounts, transfer volume, deposits held.
-- User management — suspend, reactivate, promote to administrator.
+- User management — suspend, reactivate, promote to administrator. Every
+  destructive action is confirmed and spells out its consequences first.
 - Full transfer ledger across all customers, with search and status filters.
-- **Append-only audit log** of every security-relevant action.
+- **Append-only audit log**, filterable by action and entity.
 
 ---
 
 ## Screens
 
-| Route            | Purpose                                                          |
-| ---------------- | ---------------------------------------------------------------- |
-| `/`              | Landing page                                                      |
-| `/login`, `/register` | Authentication                                               |
-| `/dashboard`     | Balances by currency, 30-day money in/out, recent activity        |
-| `/accounts`      | Open and manage accounts                                          |
-| `/accounts/:id`  | Account detail — balance, cards, statement, top-up                |
-| `/transfer`      | Send money, with saved recipients                                 |
-| `/transactions`  | Full statement: filter by account, type, date range, free text    |
-| `/beneficiaries` | Saved recipients                                                  |
-| `/admin`         | Bank-wide overview *(admin only)*                                 |
-| `/admin/users`   | User management *(admin only)*                                    |
-| `/admin/transactions` | All transfers *(admin only)*                                 |
-| `/admin/audit`   | Audit log *(admin only)*                                          |
+| Route                   | Purpose                                                        |
+| ----------------------- | -------------------------------------------------------------- |
+| `/`                     | Landing page                                                    |
+| `/login`, `/register`   | Authentication                                                  |
+| `/dashboard`            | Balances by currency, 30-day money in/out/net, recent activity   |
+| `/accounts`             | Open and manage accounts, totals per currency                    |
+| `/accounts/:id`         | Account detail — balance, cards, statement, top-up, rename, close|
+| `/transfer`             | Send money, with own-account and saved-recipient shortcuts       |
+| `/transactions`         | Full statement: filter by account, type, date, text; CSV export  |
+| `/transactions/:id`     | Transaction receipt with both sides of the entry                 |
+| `/beneficiaries`        | Saved recipients                                                 |
+| `/profile`              | Personal details, password change, signed-in devices             |
+| `/admin`                | Bank-wide overview *(admin only)*                                |
+| `/admin/users`          | User management *(admin only)*                                   |
+| `/admin/transactions`   | All transfers *(admin only)*                                     |
+| `/admin/audit`          | Filterable audit log *(admin only)*                              |
 
 ---
 
 ## Tech stack
 
-| Layer     | Choice                                                                 |
-| --------- | ---------------------------------------------------------------------- |
-| Framework | **Nuxt 4** (Vue 3, SSR, file-based routing, Nitro server)              |
-| Language  | **TypeScript**, strict mode across app, server and scripts             |
-| Database  | **PostgreSQL 17**                                                      |
-| ORM       | **Prisma 6** — typed access and versioned migrations                   |
-| Auth      | Argon2id + hashed opaque session cookies                               |
-| Validation| **Zod** schemas shared by every endpoint                               |
-| Styling   | Hand-written CSS design system with light/dark support — no UI framework|
-| Testing   | **Vitest** — unit + integration against a real PostgreSQL              |
-| CI/CD     | GitHub Actions — lint, typecheck, test, Docker build and boot check    |
+| Layer      | Choice                                                                  |
+| ---------- | ----------------------------------------------------------------------- |
+| Framework  | **Nuxt 4** (Vue 3, SSR, file-based routing, Nitro server)               |
+| Language   | **TypeScript**, strict mode across app, server and scripts             |
+| Database   | **PostgreSQL 17**                                                       |
+| ORM        | **Prisma 6** — typed access and versioned migrations                   |
+| Auth       | Argon2id + hashed opaque session cookies                                |
+| Validation | **Zod** schemas shared by every endpoint                                |
+| Styling    | Hand-written CSS design system with light/dark support — no UI framework |
+| Testing    | **Vitest** — unit + integration against a real PostgreSQL               |
+| CI/CD      | GitHub Actions — lint, typecheck, test, reconcile, build, boot          |
 
 ---
 
 ## How the money works
 
-Three rules make the ledger trustworthy. They are enforced in code, not by convention.
+Three rules make the ledger trustworthy. They are enforced in code, not by
+convention, and re-checked from SQL by `npm run db:verify`.
 
 **1. Money is never a float.** Every amount is a `BigInt` count of minor units
 (grosze, cents) end to end — database, API and business logic. Floats appear only
@@ -137,6 +145,18 @@ customer see a `409` asking them to try again.
 > balanced legs. When an account is funded for exactly *N* transfers and 3×*N* are
 > fired at once, exactly *N* succeed and the rest are cleanly refused.
 
+### Reconciling the ledger
+
+```bash
+npm run db:verify
+```
+
+Eight invariants are re-derived straight from SQL, independently of the code that
+wrote the rows: balances match entries, internal transfers balance and carry two
+legs, overdraft limits hold, entry signs match their direction, no orphaned
+entries, completed transfers are booked, and every running balance links to one
+another entry left behind. CI runs this after seeding.
+
 ---
 
 ## Architecture
@@ -144,23 +164,24 @@ customer see a `409` asking them to try again.
 ```
 app/                      Nuxt application (client + SSR)
 ├── assets/css/           Design system: tokens, components, light/dark themes
-├── components/           Reusable UI (AccountCard, TransactionRow, StatCard…)
-├── composables/          useAuth, useFormat, useApiHeaders
+├── components/           Reusable UI — cards, modals, toasts, form fields
+├── composables/          useAuth, useFormat, useToast, useApiError, …
 ├── layouts/              default (app shell) and auth (split-screen)
 ├── middleware/           Global route guard: auth + admin
 └── pages/                File-based routes
 
 server/                   Nitro server
-├── api/                  REST endpoints (auth, accounts, transfers, admin…)
+├── api/                  REST endpoints (auth, accounts, transfers, profile, admin)
 ├── middleware/           Session resolution on every /api request
 ├── services/             Business logic — the transfer engine and audit log
-└── utils/                money, iban, auth, prisma, validation, serialize
+└── utils/                money, iban, auth, prisma, validation, rateLimit, serialize
 
 prisma/
 ├── schema.prisma         Data model
 ├── migrations/           Versioned SQL migrations
 └── seed.ts               Deterministic demo data
 
+scripts/verify-ledger.ts  Standalone ledger reconciliation
 tests/                    Vitest unit + integration suites
 .tools/docker/            Dockerfiles, compose stacks, entrypoint
 ```
@@ -186,6 +207,13 @@ pinning one visitor's cookie onto it would leak that session to other users.
 `userId` (`prisma.account.findFirst({ where: { id, userId } })`), so another
 customer's identifier reads as *not found* rather than relying on a separate
 authorization branch that could be forgotten.
+
+**Failed transfers do not reveal who banks here.** If a destination IBAN exists
+inside NeoBank but cannot receive the money — frozen, or a different currency —
+the transfer is treated as external instead of being refused with a specific
+reason. Saying "that account is frozen" would confirm the IBAN belongs to a
+NeoBank customer and disclose its state. Only your *own* accounts get a
+descriptive error.
 
 ---
 
@@ -219,20 +247,21 @@ npm run dev
 
 ### Scripts
 
-| Command                | Description                                   |
-| ---------------------- | --------------------------------------------- |
-| `npm run dev`          | Start the dev server                          |
-| `npm run build`        | Production build                              |
-| `npm start`            | Run the built server                          |
-| `npm test`             | Run the test suite                            |
-| `npm run test:coverage`| Tests with a coverage report                  |
-| `npm run lint`         | ESLint                                        |
-| `npm run typecheck`    | Typecheck app, server and standalone scripts  |
-| `npm run db:migrate`   | Create and apply a migration                  |
-| `npm run db:deploy`    | Apply committed migrations (production)       |
-| `npm run db:seed`      | Seed demo data (idempotent)                   |
-| `npm run db:reset`     | Drop, re-migrate and re-seed                  |
-| `npm run db:studio`    | Prisma Studio                                 |
+| Command                 | Description                                   |
+| ----------------------- | --------------------------------------------- |
+| `npm run dev`           | Start the dev server                          |
+| `npm run build`         | Production build                              |
+| `npm start`             | Run the built server                          |
+| `npm test`              | Run the test suite                            |
+| `npm run test:coverage` | Tests with a coverage report                  |
+| `npm run lint`          | ESLint                                        |
+| `npm run typecheck`     | Typecheck app, server and standalone scripts  |
+| `npm run db:migrate`    | Create and apply a migration                  |
+| `npm run db:deploy`     | Apply committed migrations (production)       |
+| `npm run db:seed`       | Seed demo data (idempotent)                   |
+| `npm run db:verify`     | Reconcile the ledger against itself           |
+| `npm run db:reset`      | Drop, re-migrate and re-seed                  |
+| `npm run db:studio`     | Prisma Studio                                 |
 
 ---
 
@@ -242,23 +271,27 @@ npm run dev
 npm test
 ```
 
-54 tests covering the parts where a mistake costs money:
+78 tests covering the parts where a mistake costs money:
 
 - **Money handling** — parsing, formatting, round-trips, values beyond
   `Number.MAX_SAFE_INTEGER`, rejection of over-precise and negative amounts.
 - **IBAN** — validated against real-world IBANs from six countries; rejects
   tampered check digits and transpositions that a length check alone would miss.
-- **Validation** — every password rule, IBAN normalization, amount formats.
+- **Validation** — every password rule, IBAN normalization, amount formats,
+  profile and admin query schemas.
+- **Rate limiting** — window expiry, per-identifier isolation so one account
+  cannot lock out another, and reset after a successful sign-in.
 - **Retry detection** — regression tests pinning the error shapes that must stay
   retryable (Prisma reports a raw-query serialization failure as `P2010` with the
   real `40001` only in the message; matching on the code alone silently disables
   every retry).
 - **Ledger integrity** *(integration, real PostgreSQL)* — balanced entries,
-  overdraft limits, complete rollback on failure, cross-user access refusal, and a
-  concurrency test asserting that racing transfers can never overdraw an account.
+  overdraft and ceiling limits, complete rollback on failure, cross-user access
+  refusal, non-disclosure of internal accounts, and a concurrency test asserting
+  that racing transfers can never overdraw an account.
 
-Integration tests are skipped automatically when `DATABASE_URL` is unset, so the
-unit suite runs anywhere.
+Integration tests skip themselves when `DATABASE_URL` is unset, so the unit
+suite runs anywhere.
 
 ---
 
@@ -284,16 +317,16 @@ rather than serving a half-migrated application.
 
 ### Environment variables
 
-| Variable                 | Required | Default              | Description                                     |
-| ------------------------ | -------- | -------------------- | ----------------------------------------------- |
-| `DATABASE_URL`           | ✅       | —                    | PostgreSQL connection string                    |
-| `NUXT_SESSION_SECRET`    | ✅       | —                    | Session signing secret                          |
-| `POSTGRES_USER`          | ✅       | —                    | Database user (compose)                         |
-| `POSTGRES_PASSWORD`      | ✅       | —                    | Database password (compose)                     |
-| `POSTGRES_DB`            |          | `neobank_production` | Database name                                   |
-| `NUXT_SESSION_TTL_HOURS` |          | `720`                | Session lifetime (30 days)                      |
-| `SEED_ON_BOOT`           |          | `false` in prod      | Seed demo data at container start               |
-| `APP_PORT`               |          | `3000`               | Published host port                             |
+| Variable                 | Required | Default              | Description                       |
+| ------------------------ | -------- | -------------------- | --------------------------------- |
+| `DATABASE_URL`           | ✅       | —                    | PostgreSQL connection string      |
+| `NUXT_SESSION_SECRET`    | ✅       | —                    | Session signing secret            |
+| `POSTGRES_USER`          | ✅       | —                    | Database user (compose)           |
+| `POSTGRES_PASSWORD`      | ✅       | —                    | Database password (compose)       |
+| `POSTGRES_DB`            |          | `neobank_production` | Database name                     |
+| `NUXT_SESSION_TTL_HOURS` |          | `720`                | Session lifetime (30 days)        |
+| `SEED_ON_BOOT`           |          | `false` in prod      | Seed demo data at container start |
+| `APP_PORT`               |          | `3000`               | Published host port               |
 
 ---
 
@@ -305,13 +338,31 @@ rather than serving a half-migrated application.
 - Login returns an **identical error** for an unknown email and a wrong password,
   and hashes a dummy password when the account does not exist so response time
   does not reveal whether an address is registered.
-- Every input is validated server-side with Zod; client checks are convenience only.
-- Suspending a user deletes their sessions immediately.
+- **Rate limits**: 5 sign-in attempts per minute per email, 20 per minute per IP,
+  3 registrations per 10 minutes, 20 transfers per minute per customer.
+- Failed transfers never disclose whether an IBAN belongs to NeoBank.
+- Every input is validated server-side with Zod, including path parameters and
+  admin query strings; client checks are convenience only.
+- Suspending a user, or changing a password, deletes the affected sessions
+  immediately.
 - Admins cannot change their own role or status, so the panel cannot be locked out.
 
 > This is a portfolio project. It is not certified for real financial use — there
-> is no KYC/AML, no PSD2 strong customer authentication, and no payment-rail
-> integration.
+> is no KYC/AML, no PSD2 strong customer authentication, no payment-rail
+> integration, and no two-factor authentication.
+
+---
+
+## Accessibility
+
+- Every interactive control has a visible `:focus-visible` outline.
+- Forms wire labels, `aria-invalid` and `aria-describedby` to their error text;
+  errors are announced via `role="alert"`.
+- Wide tables scroll inside a keyboard-reachable region with a caption and
+  scoped headers.
+- Modals trap focus, close on Escape, and restore page scrolling on exit.
+- Icons are `aria-hidden` with text equivalents; a skip link jumps to content.
+- Animation is disabled under `prefers-reduced-motion`.
 
 ---
 

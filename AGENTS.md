@@ -69,6 +69,18 @@ Non-negotiable invariants — every one is covered by a test in
    is what prevents deadlocks between opposing transfers; keep it.
 4. **Funds are re-checked against the locked balance**, not the value the caller
    saw.
+5. **Amounts are capped.** `MAX_TRANSFER_CENTS` and `MAX_DEPOSIT_CENTS` bound a
+   single transaction. Deposits are self-service in this demo, so without the
+   ceiling any customer could mint an unbounded balance.
+6. **A failed transfer never reveals who banks here.** If the destination IBAN
+   exists but cannot receive the money (frozen, wrong currency), it is treated
+   as *external* rather than refused with a reason — a specific error would
+   confirm the IBAN belongs to NeoBank. Only the caller's own accounts get a
+   descriptive message.
+
+Run `npm run db:verify` after touching the ledger or the seeder. It re-derives
+eight invariants straight from SQL, independently of the code that wrote the
+rows.
 
 ### Serialization conflicts
 
@@ -107,6 +119,21 @@ export default defineEventHandler(async (event) => {
 - **Validate with Zod.** Add the schema to `server/utils/validation.ts` and call
   `parseOrThrow`, which turns failures into a 422 whose `data.errors` maps
   field → message. That is the shape the forms render.
+- **Path parameters are user input too.** `requireUuidParam(getRouterParam(...))`
+  — passing a raw param to Prisma surfaces a driver error as a 500 instead of a
+  clean 404.
+- **Query strings get a schema too.** The admin list endpoints previously cast a
+  raw string into a Prisma enum filter, so `?status=BOGUS` returned a 500.
+
+### Rate limiting
+
+Anything expensive or abusable calls `enforceRateLimit(event, ...)` *before* the
+work, not after. Sign-in is limited per IP **and** per email so a spray across
+many accounts is capped without letting one attacker lock a victim out. Call
+`clearRateLimit` on success so honest users are never penalized.
+
+The limiter is process memory: behind multiple replicas each process keeps its
+own window. A shared store would be needed to make the limit global.
 
 ### Services
 
@@ -135,6 +162,37 @@ routes bounce to `/login`.
 **Never patch `globalThis.$fetch` to do this automatically.** It is shared by
 every concurrent SSR render, so pinning one visitor's cookie leaks their session
 into other users' responses. This was tried and reverted; keep it per-request.
+
+### Forms and feedback
+
+Use the shared pieces rather than re-implementing them per page:
+
+- `useFormErrors()` owns `submitting`, `errors` and a `submit(fn)` wrapper that
+  maps a rejection onto field errors. Do not hand-roll the
+  `(error as { data?: ... }).data?.data` cast — `extractApiError` does it.
+- `<FormField>` renders the label, wires `aria-describedby` to the error and
+  gives the control an id. Every input belongs in one.
+- `useToast()` for the outcome of a mutation. Every successful create, update or
+  delete says so; failures surface the server's message.
+- `<ConfirmDialog>` before anything destructive, and the description must state
+  the consequence ("signed out of every device", "cards will be blocked") rather
+  than asking "are you sure?".
+- `<SkeletonBlock>` while data loads, `<AppPagination>` for paged lists,
+  `<EmptyState>` when a list is empty — with an action when one makes sense.
+
+Counterparty naming goes through `useCounterparty()`. Three pages previously had
+their own version and the same transfer showed a different name on each.
+
+### Accessibility
+
+Non-negotiable, and cheap if you use the components above:
+
+- Never remove the global `:focus-visible` outline.
+- Icons and decorative glyphs are `aria-hidden="true"`; if the icon carries
+  meaning, add a `.visually-hidden` text equivalent.
+- Error alerts get `role="alert"`; wide tables get a `<caption>`, `scope` on
+  headers, and a `tabindex="0"` scroll region.
+- Use `100dvh`, never `100vh` — mobile browser chrome overflows the latter.
 
 ### Styling
 
@@ -169,13 +227,20 @@ idempotent: upsert on natural keys, and guard history generation behind an
 existence check. It uses a seeded PRNG — demo data must be identical on every
 machine, so `Math.random()` and `Date.now()` are out for anything persisted.
 
+History is **collected first and booked in date order**. Writing events as they
+are generated stamps `balanceAfterCents` in category order rather than
+chronological order, so statements show a running balance that contradicts the
+dates beside it. `npm run db:verify` catches exactly this.
+
 ## Testing
 
 ```bash
-npm test
+npm test          # 78 tests
+npm run db:verify # reconcile the ledger from SQL
 ```
 
-- Unit tests for pure logic (`money`, `iban`, `validation`, retry detection).
+- Unit tests for pure logic (`money`, `iban`, `validation`, rate limiting,
+  retry detection).
 - Integration tests for the ledger, against real PostgreSQL — the locking and
   isolation guarantees cannot be reproduced with a mock. They skip themselves
   when `DATABASE_URL` is unset.
@@ -207,8 +272,11 @@ save space: `effect` looks like test tooling but is a real runtime dependency of
 
 - [ ] `npm run lint` and `npm run typecheck` pass.
 - [ ] `npm test` passes, including integration tests against a real database.
+- [ ] `npm run db:verify` reconciles if the ledger or seeder was touched.
 - [ ] Money stayed `BigInt`; responses went through `serializeBigInt`.
 - [ ] Queries are scoped by `userId`; admin endpoints call `requireRole`.
 - [ ] New protected page passes `useApiHeaders()` to `useFetch`.
+- [ ] Mutations show a toast; destructive ones ask first via `<ConfirmDialog>`.
+- [ ] Inputs sit in `<FormField>`; icons are `aria-hidden`.
 - [ ] Colours and spacing come from tokens, not literals.
 - [ ] Copy is English.
