@@ -7,7 +7,13 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { PrismaClient } from '@prisma/client'
-import { executeDeposit, executeTransfer, TransferError } from '../server/services/transfers'
+import {
+  executeDeposit,
+  executeTransfer,
+  MAX_DEPOSIT_CENTS,
+  MAX_TRANSFER_CENTS,
+  TransferError,
+} from '../server/services/transfers'
 import { generateIban } from '../server/utils/iban'
 
 const DATABASE_AVAILABLE = Boolean(process.env.DATABASE_URL)
@@ -236,6 +242,94 @@ suite('ledger integrity', () => {
     expect(succeeded).toBeLessThanOrEqual(3)
     expect(final.balanceCents).toBeGreaterThanOrEqual(0n)
     expect(final.balanceCents).toBe(30_000n - BigInt(succeeded) * 10_000n)
+  })
+
+  it('refuses a transfer above the per-transaction ceiling', async () => {
+    await expect(
+      executeTransfer({
+        userId,
+        sourceAccountId: accountA,
+        destinationIban: ibanB,
+        amountCents: MAX_TRANSFER_CENTS + 1n,
+        title: 'Over the cap',
+      }),
+    ).rejects.toThrow(/limited to/i)
+  })
+
+  it('refuses a deposit above the per-transaction ceiling', async () => {
+    await expect(
+      executeDeposit({
+        userId,
+        accountId: accountA,
+        amountCents: MAX_DEPOSIT_CENTS + 1n,
+        title: 'Over the cap',
+      }),
+    ).rejects.toThrow(/limited to/i)
+  })
+
+  it('books a cross-currency transfer to another customer as external, revealing nothing', async () => {
+    // A EUR account owned by someone else must not be identifiable as internal:
+    // the transfer is accepted and recorded as an ordinary outbound payment.
+    const stranger = await prisma.user.create({
+      data: {
+        email: `stranger-${Date.now()}@test.local`,
+        passwordHash: 'x',
+        firstName: 'Stranger',
+        lastName: 'User',
+        accounts: { create: [{ iban: generateIban(), name: 'EUR', currency: 'EUR' }] },
+      },
+      include: { accounts: true },
+    })
+
+    try {
+      // Fund independently — earlier tests may have drained this account.
+      await executeDeposit({
+        userId,
+        accountId: accountA,
+        amountCents: 5_000n,
+        title: 'Probe funding',
+      })
+
+      const transfer = await executeTransfer({
+        userId,
+        sourceAccountId: accountA,
+        destinationIban: stranger.accounts[0]!.iban,
+        amountCents: 1_000n,
+        title: 'Probe',
+      })
+
+      expect(transfer.type).toBe('EXTERNAL')
+      expect(transfer.destinationAccountId).toBeNull()
+
+      // The stranger's balance is untouched — no money crossed currencies.
+      const untouched = await prisma.account.findUniqueOrThrow({
+        where: { id: stranger.accounts[0]!.id },
+      })
+
+      expect(untouched.balanceCents).toBe(0n)
+    } finally {
+      await prisma.user.delete({ where: { id: stranger.id } })
+    }
+  })
+
+  it('explains the problem when the blocked destination is the caller\'s own account', async () => {
+    const eur = await prisma.account.create({
+      data: { iban: generateIban(), name: 'My Euro', currency: 'EUR', userId },
+    })
+
+    try {
+      await expect(
+        executeTransfer({
+          userId,
+          sourceAccountId: accountA,
+          destinationIban: eur.iban,
+          amountCents: 1_000n,
+          title: 'Own account',
+        }),
+      ).rejects.toThrow(/does not convert currency/i)
+    } finally {
+      await prisma.account.delete({ where: { id: eur.id } })
+    }
   })
 
   it('keeps every account consistent with the sum of its entries', async () => {

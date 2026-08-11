@@ -12,8 +12,7 @@ const form = reactive({
   phone: '',
   password: '',
 })
-const errors = ref<Record<string, string>>({})
-const submitting = ref(false)
+const { errors, submitting, submit } = useFormErrors()
 
 /** Mirrors the server rules in server/utils/validation.ts. */
 const passwordChecks = computed(() => [
@@ -23,25 +22,30 @@ const passwordChecks = computed(() => [
   { label: 'One digit', met: /\d/.test(form.password) },
 ])
 
-async function onSubmit() {
-  submitting.value = true
-  errors.value = {}
+const canSubmit = computed(
+  () =>
+    form.firstName.trim().length >= 2 &&
+    form.lastName.trim().length >= 2 &&
+    form.email.includes('@') &&
+    passwordChecks.value.every((check) => check.met),
+)
 
-  try {
-    await register({
-      firstName: form.firstName,
-      lastName: form.lastName,
-      email: form.email,
-      password: form.password,
-      phone: form.phone || undefined,
-    })
-    await navigateTo('/dashboard')
-  } catch (error) {
-    const data = (error as { data?: { data?: { errors?: Record<string, string> } } }).data?.data
-    errors.value = data?.errors ?? { form: 'Unable to create the account. Please try again.' }
-  } finally {
-    submitting.value = false
-  }
+async function onSubmit() {
+  const user = await submit(
+    () =>
+      register({
+        firstName: form.firstName,
+        lastName: form.lastName,
+        email: form.email,
+        password: form.password,
+        phone: form.phone || undefined,
+      }),
+    'Unable to create the account. Please try again.',
+  )
+
+  if (!user) return
+
+  await navigateTo('/dashboard')
 }
 </script>
 
@@ -52,7 +56,7 @@ async function onSubmit() {
       <p class="muted small">A personal PLN account is created for you straight away.</p>
     </div>
 
-    <div v-if="errors.form" class="alert alert-error">{{ errors.form }}</div>
+    <div v-if="errors.form" class="alert alert-error" role="alert">{{ errors.form }}</div>
 
     <form class="stack" novalidate @submit.prevent="onSubmit">
       <div class="grid grid-2 name-grid">
@@ -130,8 +134,8 @@ async function onSubmit() {
         <span v-if="errors.password" class="field-error">{{ errors.password }}</span>
       </div>
 
-      <button class="btn btn-block" type="submit" :disabled="submitting">
-        <span v-if="submitting" class="spinner" />
+      <button class="btn btn-block" type="submit" :disabled="submitting || !canSubmit">
+        <span v-if="submitting" class="spinner" aria-hidden="true" />
         {{ submitting ? 'Creating account…' : 'Open account' }}
       </button>
     </form>

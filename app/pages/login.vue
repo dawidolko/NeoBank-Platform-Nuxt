@@ -5,28 +5,28 @@ useHead({ title: 'Sign in — NeoBank' })
 
 const { login } = useAuth()
 const route = useRoute()
+const { errors, submitting, submit } = useFormErrors()
 
 const form = reactive({ email: '', password: '' })
-const errors = ref<Record<string, string>>({})
-const submitting = ref(false)
+
+const canSubmit = computed(() => form.email.includes('@') && form.password.length > 0)
 
 async function onSubmit() {
-  submitting.value = true
-  errors.value = {}
+  const user = await submit(
+    () => login(form.email, form.password),
+    'Unable to sign in. Please try again.',
+  )
 
-  try {
-    await login(form.email, form.password)
-    // Only follow a same-origin path — never an absolute URL from the query.
-    const redirect = route.query.redirect
-    const target = typeof redirect === 'string' && redirect.startsWith('/') ? redirect : '/dashboard'
+  if (!user) return
 
-    await navigateTo(target)
-  } catch (error) {
-    const data = (error as { data?: { data?: { errors?: Record<string, string> } } }).data?.data
-    errors.value = data?.errors ?? { form: 'Unable to sign in. Please try again.' }
-  } finally {
-    submitting.value = false
-  }
+  // Only follow a same-origin path — never an absolute URL from the query.
+  const redirect = route.query.redirect
+  const target =
+    typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//')
+      ? redirect
+      : '/dashboard'
+
+  await navigateTo(target)
 }
 
 /** One click to fill the seeded demo accounts. */
@@ -43,7 +43,7 @@ function useDemo(role: 'customer' | 'admin') {
       <p class="muted small">Sign in to your NeoBank account.</p>
     </div>
 
-    <div v-if="errors.form" class="alert alert-error">{{ errors.form }}</div>
+    <div v-if="errors.form" class="alert alert-error" role="alert">{{ errors.form }}</div>
 
     <form class="stack" novalidate @submit.prevent="onSubmit">
       <div class="field">
@@ -74,8 +74,8 @@ function useDemo(role: 'customer' | 'admin') {
         <span v-if="errors.password" class="field-error">{{ errors.password }}</span>
       </div>
 
-      <button class="btn btn-block" type="submit" :disabled="submitting">
-        <span v-if="submitting" class="spinner" />
+      <button class="btn btn-block" type="submit" :disabled="submitting || !canSubmit">
+        <span v-if="submitting" class="spinner" aria-hidden="true" />
         {{ submitting ? 'Signing in…' : 'Sign in' }}
       </button>
     </form>
