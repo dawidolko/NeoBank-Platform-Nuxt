@@ -4,18 +4,33 @@ useHead({ title: 'Audit log — Admin — NeoBank' })
 const { dateTime } = useFormat()
 
 const page = ref(1)
-const query = computed(() => ({ page: page.value, perPage: 30 }))
+const action = ref('')
+const entityType = ref('')
 
-const { data, pending } = await useFetch('/api/admin/audit', { query, headers: useApiHeaders() })
+const query = computed(() => ({
+  page: page.value,
+  perPage: 30,
+  ...(action.value ? { action: action.value } : {}),
+  ...(entityType.value ? { entityType: entityType.value } : {}),
+}))
+
+const { data, pending } = await useFetch('/api/admin/audit', {
+  query,
+  headers: useApiHeaders(),
+})
 
 const logs = computed(() => data.value?.logs ?? [])
 const pagination = computed(() => data.value?.pagination)
 
+watch([action, entityType], () => { page.value = 1 })
+
+const hasFilters = computed(() => Boolean(action.value || entityType.value))
+
 /** Colour-code the action families so scanning the log is quick. */
-function toneFor(action: string): string {
-  if (action.includes('failed')) return 'badge-danger'
-  if (action.startsWith('admin.')) return 'badge-warning'
-  if (action.includes('transfer') || action.includes('deposit')) return 'badge-primary'
+function toneFor(value: string): string {
+  if (value.includes('failed')) return 'badge-danger'
+  if (value.startsWith('admin.')) return 'badge-warning'
+  if (value.includes('transfer') || value.includes('deposit')) return 'badge-primary'
 
   return ''
 }
@@ -31,26 +46,65 @@ function summarize(metadata: unknown): string {
 
 <template>
   <div class="stack">
-    <div>
-      <NuxtLink to="/admin" class="small">← Admin</NuxtLink>
-      <h1>Audit log</h1>
-      <p class="muted small">Append-only record of every security-relevant action.</p>
+    <div class="row-between">
+      <div>
+        <NuxtLink to="/admin" class="small">← Admin</NuxtLink>
+        <h1>Audit log</h1>
+        <p class="muted small">Append-only record of every security-relevant action.</p>
+      </div>
     </div>
 
     <section class="card">
-      <div v-if="pending" class="empty">Loading audit trail…</div>
+      <h2 class="visually-hidden">Filters</h2>
+      <div class="filters">
+        <FormField v-slot="field" label="Action" hint="Partial match, e.g. “login”">
+          <input
+            :id="field.id"
+            v-model.lazy="action"
+            class="input"
+            type="search"
+            :aria-describedby="field.describedBy"
+            placeholder="transfer.executed"
+          >
+        </FormField>
+
+        <FormField v-slot="field" label="Entity">
+          <select :id="field.id" v-model="entityType" class="select">
+            <option value="">All entities</option>
+            <option value="User">User</option>
+            <option value="Account">Account</option>
+            <option value="Transfer">Transfer</option>
+          </select>
+        </FormField>
+
+        <div class="field filter-reset">
+          <button
+            class="btn btn-secondary"
+            type="button"
+            :disabled="!hasFilters"
+            @click="action = ''; entityType = ''"
+          >
+            Clear
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <SkeletonBlock v-if="pending" :rows="10" height="30px" />
 
       <template v-else-if="logs.length">
-        <div class="table-wrap">
+        <div class="table-wrap" tabindex="0" role="region" aria-label="Audit log table">
           <table class="table">
+            <caption class="visually-hidden">Security-relevant events, newest first</caption>
             <thead>
               <tr>
-                <th>When</th>
-                <th>Action</th>
-                <th>Actor</th>
-                <th>Entity</th>
-                <th>Details</th>
-                <th>IP</th>
+                <th scope="col">When</th>
+                <th scope="col">Action</th>
+                <th scope="col">Actor</th>
+                <th scope="col">Entity</th>
+                <th scope="col">Details</th>
+                <th scope="col">IP</th>
               </tr>
             </thead>
             <tbody>
@@ -58,9 +112,7 @@ function summarize(metadata: unknown): string {
                 <td class="tiny muted">{{ dateTime(log.createdAt) }}</td>
                 <td><span class="badge" :class="toneFor(log.action)">{{ log.action }}</span></td>
                 <td class="tiny">
-                  <template v-if="log.user">
-                    {{ log.user.firstName }} {{ log.user.lastName }}
-                  </template>
+                  <template v-if="log.user">{{ log.user.firstName }} {{ log.user.lastName }}</template>
                   <span v-else class="muted">System</span>
                 </td>
                 <td class="tiny">{{ log.entityType }}</td>
@@ -71,39 +123,34 @@ function summarize(metadata: unknown): string {
           </table>
         </div>
 
-        <div v-if="pagination && pagination.pages > 1" class="pagination">
-          <button class="btn btn-secondary btn-sm" type="button" :disabled="page <= 1" @click="page -= 1">
-            Previous
-          </button>
-          <span class="small muted">
-            Page {{ pagination.page }} of {{ pagination.pages }} · {{ pagination.total }} events
-          </span>
-          <button
-            class="btn btn-secondary btn-sm"
-            type="button"
-            :disabled="page >= pagination.pages"
-            @click="page += 1"
-          >
-            Next
-          </button>
-        </div>
+        <AppPagination
+          v-if="pagination"
+          :page="pagination.page"
+          :pages="pagination.pages"
+          :total="pagination.total"
+          label="events"
+          @update:page="page = $event"
+        />
       </template>
 
-      <EmptyState v-else icon="📋" title="Audit log is empty" />
+      <EmptyState
+        v-else
+        icon="📋"
+        :title="hasFilters ? 'No matching events' : 'Audit log is empty'"
+        :description="hasFilters ? 'Try clearing the filters.' : undefined"
+      />
     </section>
   </div>
 </template>
 
 <style scoped>
-.details { max-width: 320px; }
-
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 12px;
-  padding-top: 15px;
-  border-top: 1px solid var(--border);
-  flex-wrap: wrap;
+  align-items: end;
 }
+
+.filter-reset { justify-content: flex-end; }
+.details { max-width: 320px; }
 </style>

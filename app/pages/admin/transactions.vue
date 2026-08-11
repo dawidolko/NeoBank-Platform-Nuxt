@@ -1,7 +1,8 @@
 <script setup lang="ts">
 useHead({ title: 'Transactions — Admin — NeoBank' })
 
-const { money, dateTime, maskIban } = useFormat()
+const { money, dateTime } = useFormat()
+const { forSide } = useCounterparty()
 
 const search = ref('')
 const status = ref('')
@@ -21,17 +22,6 @@ const pagination = computed(() => data.value?.pagination)
 
 watch([search, status], () => { page.value = 1 })
 
-function partyLabel(
-  account: { name: string; user: { firstName: string; lastName: string } } | null,
-  fallbackName?: string | null,
-  fallbackIban?: string | null,
-): string {
-  if (account) return `${account.user.firstName} ${account.user.lastName}`
-  if (fallbackName) return fallbackName
-  if (fallbackIban) return maskIban(fallbackIban)
-
-  return '—'
-}
 </script>
 
 <template>
@@ -55,21 +45,22 @@ function partyLabel(
     </div>
 
     <section class="card">
-      <div v-if="pending" class="empty">Loading transfers…</div>
+      <SkeletonBlock v-if="pending" :rows="8" height="34px" />
 
       <template v-else-if="transfers.length">
-        <div class="table-wrap">
+        <div class="table-wrap" tabindex="0" role="region" aria-label="All transfers table">
           <table class="table">
+            <caption class="visually-hidden">Bank-wide transfer ledger</caption>
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Reference</th>
-                <th>Description</th>
-                <th>From</th>
-                <th>To</th>
-                <th>Type</th>
-                <th>Status</th>
-                <th class="align-right">Amount</th>
+                <th scope="col">Date</th>
+                <th scope="col">Reference</th>
+                <th scope="col">Description</th>
+                <th scope="col">From</th>
+                <th scope="col">To</th>
+                <th scope="col">Type</th>
+                <th scope="col">Status</th>
+                <th scope="col" class="align-right">Amount</th>
               </tr>
             </thead>
             <tbody>
@@ -77,9 +68,9 @@ function partyLabel(
                 <td class="tiny muted">{{ dateTime(transfer.createdAt) }}</td>
                 <td class="mono tiny">{{ transfer.reference }}</td>
                 <td class="truncate cell-title">{{ transfer.title }}</td>
-                <td class="tiny">{{ partyLabel(transfer.sourceAccount) }}</td>
+                <td class="tiny">{{ forSide(transfer.sourceAccount) }}</td>
                 <td class="tiny">
-                  {{ partyLabel(transfer.destinationAccount, transfer.externalName, transfer.externalIban) }}
+                  {{ forSide(transfer.destinationAccount, transfer.externalName, transfer.externalIban) }}
                 </td>
                 <td><span class="badge">{{ transfer.type }}</span></td>
                 <td><StatusBadge :status="transfer.status" /></td>
@@ -91,22 +82,14 @@ function partyLabel(
           </table>
         </div>
 
-        <div v-if="pagination && pagination.pages > 1" class="pagination">
-          <button class="btn btn-secondary btn-sm" type="button" :disabled="page <= 1" @click="page -= 1">
-            Previous
-          </button>
-          <span class="small muted">
-            Page {{ pagination.page }} of {{ pagination.pages }} · {{ pagination.total }} transfers
-          </span>
-          <button
-            class="btn btn-secondary btn-sm"
-            type="button"
-            :disabled="page >= pagination.pages"
-            @click="page += 1"
-          >
-            Next
-          </button>
-        </div>
+        <AppPagination
+          v-if="pagination"
+          :page="pagination.page"
+          :pages="pagination.pages"
+          :total="pagination.total"
+          label="transfers"
+          @update:page="page = $event"
+        />
       </template>
 
       <EmptyState v-else icon="🔍" title="No transfers found" />
@@ -119,13 +102,4 @@ function partyLabel(
 .status-filter { max-width: 160px; }
 .cell-title { max-width: 200px; }
 
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding-top: 15px;
-  border-top: 1px solid var(--border);
-  flex-wrap: wrap;
-}
 </style>
