@@ -1,4 +1,6 @@
-import type { H3Event } from 'h3'
+// Imported explicitly rather than relying on Nitro's auto-import: this module
+// is also loaded directly by the Vitest suites, which run outside Nitro.
+import { createError, getRequestIP, setResponseHeader, type H3Event } from 'h3'
 
 interface Bucket {
   count: number

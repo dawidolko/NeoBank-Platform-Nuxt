@@ -2,19 +2,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { __resetRateLimits, clearRateLimit, enforceRateLimit } from '../server/utils/rateLimit'
 
 /**
- * The limiter reads the client IP and writes a response header through h3's
- * request helpers, which are Nitro auto-imports at runtime. Stubbing them keeps
- * these tests free of a live server.
+ * The limiter reads the client IP and writes a response header through h3.
+ * Mocking the module keeps these tests free of a live server.
  */
 const headers = new Map<string, unknown>()
 
-vi.stubGlobal('getRequestIP', () => '203.0.113.7')
-vi.stubGlobal('setResponseHeader', (_event: unknown, name: string, value: unknown) => {
-  headers.set(name, value)
-})
-vi.stubGlobal('createError', (init: { statusCode: number; statusMessage: string; data?: unknown }) =>
-  Object.assign(new Error(init.statusMessage), init),
-)
+vi.mock('h3', () => ({
+  getRequestIP: () => '203.0.113.7',
+  setResponseHeader: (_event: unknown, name: string, value: unknown) => {
+    headers.set(name, value)
+  },
+  createError: (init: { statusCode: number; statusMessage: string; data?: unknown }) =>
+    Object.assign(new Error(init.statusMessage), init),
+}))
 
 const event = {} as never
 

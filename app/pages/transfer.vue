@@ -3,9 +3,15 @@ useHead({ title: 'Send money — NeoBank' })
 
 const route = useRoute()
 const { money, iban: formatIban } = useFormat()
+const toast = useToast()
+const { errors, submitting, submit } = useFormErrors()
 
-const { data: accountData } = await useFetch('/api/accounts', { headers: useApiHeaders() })
-const { data: beneficiaryData } = await useFetch('/api/beneficiaries', { headers: useApiHeaders() })
+const { data: accountData, refresh: refreshAccounts } = await useFetch('/api/accounts', {
+  headers: useApiHeaders(),
+})
+const { data: beneficiaryData } = await useFetch('/api/beneficiaries', {
+  headers: useApiHeaders(),
+})
 
 const accounts = computed(() => accountData.value?.accounts ?? [])
 const beneficiaries = computed(() => beneficiaryData.value?.beneficiaries ?? [])
@@ -17,186 +23,289 @@ const form = reactive({
   title: '',
   externalName: '',
 })
-const errors = ref<Record<string, string>>({})
-const submitting = ref(false)
-const success = ref<{ reference: string; amount: string } | null>(null)
 
-// Preselect from ?from=<accountId>, else the first account.
-watchEffect(() => {
-  if (form.sourceAccountId || accounts.value.length === 0) return
+const receipt = ref<{ reference: string; amount: string; title: string } | null>(null)
 
-  const preferred = route.query.from
-  const match = accounts.value.find((account) => account.id === preferred)
-
-  form.sourceAccountId = match?.id ?? accounts.value[0]!.id
-})
+const openAccounts = computed(() => accounts.value.filter((account) => account.status === 'ACTIVE'))
 
 const selectedAccount = computed(() =>
   accounts.value.find((account) => account.id === form.sourceAccountId),
 )
 
+/** Own accounts in the same currency — the only ones a transfer can reach. */
+const ownDestinations = computed(() =>
+  openAccounts.value.filter(
+    (account) =>
+      account.id !== form.sourceAccountId && account.currency === selectedAccount.value?.currency,
+  ),
+)
+
+watchEffect(() => {
+  if (form.sourceAccountId || openAccounts.value.length === 0) return
+
+  const preferred = route.query.from
+  const match = openAccounts.value.find((account) => account.id === preferred)
+
+  form.sourceAccountId = match?.id ?? openAccounts.value[0]!.id
+})
+
+// Recipients link here as /transfer?to=<iban>; prefill so the CTA does something.
+onMounted(() => {
+  const to = route.query.to
+
+  if (typeof to !== 'string' || !to) return
+
+  form.destinationIban = to
+
+  const saved = beneficiaries.value.find((beneficiary) => beneficiary.iban === to)
+
+  if (saved) form.externalName = saved.name
+})
+
+const amountCents = computed(() => {
+  const raw = form.amount.trim().replace(/\s/g, '').replace(',', '.')
+
+  if (!/^\d+(\.\d{1,2})?$/.test(raw)) return null
+
+  const [whole = '0', fraction = ''] = raw.split('.')
+
+  return BigInt(whole) * 100n + BigInt(fraction.padEnd(2, '0') || '0')
+})
+
+/**
+ * Mirrors the server rule so the customer is told before a round trip.
+ * The server still re-checks against the locked balance — this is only UX.
+ */
+const availableCents = computed(() =>
+  selectedAccount.value
+    ? BigInt(selectedAccount.value.balanceCents) + BigInt(selectedAccount.value.overdraftCents)
+    : 0n,
+)
+
+const exceedsBalance = computed(
+  () => amountCents.value !== null && amountCents.value > availableCents.value,
+)
+
+const canSubmit = computed(
+  () =>
+    Boolean(form.sourceAccountId) &&
+    form.destinationIban.replace(/\s/g, '').length > 8 &&
+    amountCents.value !== null &&
+    amountCents.value > 0n &&
+    !exceedsBalance.value &&
+    form.title.trim().length >= 3,
+)
+
+function useOwnAccount(iban: string) {
+  form.destinationIban = iban
+  form.externalName = ''
+}
+
+function useBeneficiary(beneficiary: { iban: string; name: string }) {
+  form.destinationIban = beneficiary.iban
+  form.externalName = beneficiary.name
+}
+
 async function onSubmit() {
-  submitting.value = true
-  errors.value = {}
-  success.value = null
+  receipt.value = null
 
-  try {
-    const response = await $fetch<{ transfer: { reference: string; amountCents: string; currency: string } }>(
-      '/api/transfers',
-      { method: 'POST', body: { ...form, externalName: form.externalName || undefined } },
-    )
+  const response = await submit(
+    () =>
+      $fetch<{ transfer: { reference: string; amountCents: string; currency: string; title: string } }>(
+        '/api/transfers',
+        { method: 'POST', body: { ...form, externalName: form.externalName || undefined } },
+      ),
+    'The transfer could not be completed.',
+  )
 
-    success.value = {
-      reference: response.transfer.reference,
-      amount: money(response.transfer.amountCents, response.transfer.currency),
-    }
-
-    form.destinationIban = ''
-    form.amount = ''
-    form.title = ''
-    form.externalName = ''
-
-    await refreshNuxtData()
-  } catch (error) {
-    const payload = (error as { data?: { data?: { errors?: Record<string, string> } } }).data?.data
-    errors.value = payload?.errors ?? { form: 'The transfer could not be completed.' }
-  } finally {
-    submitting.value = false
+  if (!response) {
+    toast.error('Transfer failed', errors.value.form)
+    return
   }
+
+  receipt.value = {
+    reference: response.transfer.reference,
+    amount: money(response.transfer.amountCents, response.transfer.currency),
+    title: response.transfer.title,
+  }
+
+  toast.success('Transfer sent', `${receipt.value.amount} · ${receipt.value.reference}`)
+
+  form.destinationIban = ''
+  form.amount = ''
+  form.title = ''
+  form.externalName = ''
+
+  await refreshAccounts()
 }
 </script>
 
 <template>
   <div class="stack transfer-page">
-    <div>
+    <header>
       <h1>Send money</h1>
       <p class="muted small">Instant to NeoBank accounts, next business day to other banks.</p>
+    </header>
+
+    <div v-if="receipt" class="alert alert-success" role="status">
+      Sent <strong>{{ receipt.amount }}</strong> — “{{ receipt.title }}”, reference
+      <strong class="mono">{{ receipt.reference }}</strong>
     </div>
 
-    <div v-if="success" class="alert alert-success">
-      Sent {{ success.amount }} · reference <strong class="mono">{{ success.reference }}</strong>
+    <div v-if="errors.form" class="alert alert-error" role="alert">{{ errors.form }}</div>
+
+    <div v-if="openAccounts.length === 0" class="card">
+      <EmptyState
+        icon="🏦"
+        title="No open accounts"
+        description="Open an account before sending money."
+      >
+        <template #action>
+          <NuxtLink to="/accounts" class="btn btn-sm">Open an account</NuxtLink>
+        </template>
+      </EmptyState>
     </div>
 
-    <div v-if="errors.form" class="alert alert-error">{{ errors.form }}</div>
-
-    <div class="transfer-grid">
+    <div v-else class="transfer-grid">
       <form class="card stack" novalidate @submit.prevent="onSubmit">
-        <div class="field">
-          <label class="field-label" for="source">From account</label>
+        <FormField v-slot="field" label="From account" :error="errors.sourceAccountId">
           <select
-            id="source"
+            :id="field.id"
             v-model="form.sourceAccountId"
             class="select"
-            :class="{ 'has-error': errors.sourceAccountId }"
-            required
+            :class="{ 'has-error': field.invalid }"
+            :aria-describedby="field.describedBy"
           >
-            <option v-for="account in accounts" :key="account.id" :value="account.id">
+            <option v-for="account in openAccounts" :key="account.id" :value="account.id">
               {{ account.name }} — {{ money(account.balanceCents, account.currency) }}
             </option>
           </select>
-          <span v-if="selectedAccount" class="field-hint mono">
-            {{ formatIban(selectedAccount.iban) }}
-          </span>
-          <span v-if="errors.sourceAccountId" class="field-error">{{ errors.sourceAccountId }}</span>
-        </div>
+        </FormField>
 
-        <div class="field">
-          <label class="field-label" for="destination">Recipient IBAN</label>
+        <p v-if="selectedAccount" class="field-hint mono account-iban">
+          {{ formatIban(selectedAccount.iban) }}
+        </p>
+
+        <FormField
+          v-slot="field"
+          label="Recipient IBAN"
+          :error="errors.destinationIban"
+          hint="Any valid IBAN. NeoBank accounts arrive instantly."
+        >
           <input
-            id="destination"
+            :id="field.id"
             v-model="form.destinationIban"
             class="input mono"
-            :class="{ 'has-error': errors.destinationIban }"
+            :class="{ 'has-error': field.invalid }"
+            :aria-invalid="field.invalid"
+            :aria-describedby="field.describedBy"
+            autocomplete="off"
             placeholder="PL00 0000 0000 0000 0000 0000 0000"
-            required
           >
-          <span v-if="errors.destinationIban" class="field-error">{{ errors.destinationIban }}</span>
-        </div>
+        </FormField>
 
-        <div class="field">
-          <label class="field-label" for="externalName">
-            Recipient name <span class="muted">(external transfers)</span>
-          </label>
+        <FormField v-slot="field" label="Recipient name" :error="errors.externalName" optional>
           <input
-            id="externalName"
+            :id="field.id"
             v-model="form.externalName"
             class="input"
+            :aria-describedby="field.describedBy"
             placeholder="Jan Nowak"
           >
-        </div>
+        </FormField>
 
-        <div class="grid grid-2 amount-grid">
-          <div class="field">
-            <label class="field-label" for="amount">Amount</label>
+        <div class="grid amount-grid">
+          <FormField
+            v-slot="field"
+            label="Amount"
+            :error="errors.amount || (exceedsBalance ? 'More than the available balance' : undefined)"
+            :hint="selectedAccount ? `Available: ${money(availableCents, selectedAccount.currency)}` : undefined"
+          >
             <input
-              id="amount"
+              :id="field.id"
               v-model="form.amount"
               class="input numeric"
-              :class="{ 'has-error': errors.amount }"
+              :class="{ 'has-error': field.invalid }"
+              :aria-invalid="field.invalid"
+              :aria-describedby="field.describedBy"
               inputmode="decimal"
               placeholder="120.50"
-              required
             >
-            <span v-if="errors.amount" class="field-error">{{ errors.amount }}</span>
-            <span v-else-if="selectedAccount" class="field-hint">
-              Currency: {{ selectedAccount.currency }}
-            </span>
-          </div>
+          </FormField>
 
-          <div class="field">
-            <label class="field-label" for="title">Reference / title</label>
+          <FormField v-slot="field" label="Reference" :error="errors.title">
             <input
-              id="title"
+              :id="field.id"
               v-model="form.title"
               class="input"
-              :class="{ 'has-error': errors.title }"
+              :class="{ 'has-error': field.invalid }"
+              :aria-invalid="field.invalid"
+              :aria-describedby="field.describedBy"
+              maxlength="140"
               placeholder="Invoice 04/2026"
-              required
             >
-            <span v-if="errors.title" class="field-error">{{ errors.title }}</span>
-          </div>
+          </FormField>
         </div>
 
-        <button class="btn btn-block" type="submit" :disabled="submitting">
-          <span v-if="submitting" class="spinner" />
+        <button class="btn btn-block" type="submit" :disabled="submitting || !canSubmit">
+          <span v-if="submitting" class="spinner" aria-hidden="true" />
           {{ submitting ? 'Sending…' : 'Send transfer' }}
         </button>
       </form>
 
-      <aside class="card stack">
-        <h2 class="card-title">Saved recipients</h2>
+      <aside class="stack">
+        <section v-if="ownDestinations.length" class="card stack">
+          <h2 class="card-title">Your accounts</h2>
+          <p class="tiny muted">Move money between your own {{ selectedAccount?.currency }} accounts.</p>
 
-        <div v-if="beneficiaries.length" class="stack recipients">
-          <button
-            v-for="beneficiary in beneficiaries"
-            :key="beneficiary.id"
-            class="recipient"
-            type="button"
-            @click="form.destinationIban = beneficiary.iban; form.externalName = beneficiary.name"
-          >
-            <span class="recipient-name truncate">{{ beneficiary.name }}</span>
-            <span class="tiny muted mono truncate">{{ formatIban(beneficiary.iban) }}</span>
-            <span v-if="beneficiary.bankName" class="tiny muted">{{ beneficiary.bankName }}</span>
-          </button>
-        </div>
+          <ul class="picker-list">
+            <li v-for="account in ownDestinations" :key="account.id">
+              <button class="picker" type="button" @click="useOwnAccount(account.iban)">
+                <span class="picker-name truncate">{{ account.name }}</span>
+                <span class="tiny muted numeric">
+                  {{ money(account.balanceCents, account.currency) }}
+                </span>
+              </button>
+            </li>
+          </ul>
+        </section>
 
-        <EmptyState
-          v-else
-          icon="👤"
-          title="No saved recipients"
-          description="Save the people you pay often."
-        />
+        <section class="card stack">
+          <h2 class="card-title">Saved recipients</h2>
 
-        <NuxtLink to="/beneficiaries" class="btn btn-secondary btn-sm btn-block">
-          Manage recipients
-        </NuxtLink>
+          <ul v-if="beneficiaries.length" class="picker-list">
+            <li v-for="beneficiary in beneficiaries" :key="beneficiary.id">
+              <button
+                class="picker"
+                type="button"
+                :aria-label="`Use ${beneficiary.name} as the recipient`"
+                @click="useBeneficiary(beneficiary)"
+              >
+                <span class="picker-name truncate">{{ beneficiary.name }}</span>
+                <span class="tiny muted mono truncate">{{ formatIban(beneficiary.iban) }}</span>
+                <span v-if="beneficiary.bankName" class="tiny muted">{{ beneficiary.bankName }}</span>
+              </button>
+            </li>
+          </ul>
+
+          <EmptyState
+            v-else
+            icon="👤"
+            title="No saved recipients"
+            description="Save the people you pay often."
+          />
+
+          <NuxtLink to="/beneficiaries" class="btn btn-secondary btn-sm btn-block">
+            Manage recipients
+          </NuxtLink>
+        </section>
       </aside>
     </div>
   </div>
 </template>
 
 <style scoped>
-.transfer-page { max-width: 960px; }
+.transfer-page { max-width: 980px; }
 
 .transfer-grid {
   display: grid;
@@ -205,10 +314,20 @@ async function onSubmit() {
   align-items: start;
 }
 
+.account-iban { margin-top: -10px; }
 .amount-grid { gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
-.recipients { gap: 8px; }
 
-.recipient {
+.picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.picker {
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -223,8 +342,8 @@ async function onSubmit() {
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
-.recipient:hover { border-color: var(--primary); background: var(--primary-soft); }
-.recipient-name { font-size: 0.87rem; font-weight: 600; }
+.picker:hover { border-color: var(--primary); background: var(--primary-soft); }
+.picker-name { font-size: 0.87rem; font-weight: 600; }
 
 @media (max-width: 820px) {
   .transfer-grid { grid-template-columns: 1fr; }

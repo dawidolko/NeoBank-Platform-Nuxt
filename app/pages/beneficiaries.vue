@@ -2,96 +2,113 @@
 useHead({ title: 'Recipients — NeoBank' })
 
 const { iban: formatIban } = useFormat()
+const toast = useToast()
+const { errors, submitting, submit } = useFormErrors()
 
-const { data, pending, refresh } = await useFetch('/api/beneficiaries', { headers: useApiHeaders() })
+const { data, pending, refresh } = await useFetch('/api/beneficiaries', {
+  headers: useApiHeaders(),
+})
 
 const beneficiaries = computed(() => data.value?.beneficiaries ?? [])
 
 const form = reactive({ name: '', iban: '', bankName: '' })
-const errors = ref<Record<string, string>>({})
-const submitting = ref(false)
-const removingId = ref<string | null>(null)
+
+const pendingRemoval = ref<{ id: string; name: string } | null>(null)
+const removing = ref(false)
+
+const canSubmit = computed(
+  () => form.name.trim().length >= 2 && form.iban.replace(/\s/g, '').length > 8,
+)
 
 async function addBeneficiary() {
-  submitting.value = true
-  errors.value = {}
+  const created = await submit(
+    () =>
+      $fetch<{ beneficiary: { id: string } }>('/api/beneficiaries', {
+        method: 'POST',
+        body: { ...form, bankName: form.bankName || undefined },
+      }),
+    'Could not save the recipient.',
+  )
 
-  try {
-    await $fetch('/api/beneficiaries', {
-      method: 'POST',
-      body: { ...form, bankName: form.bankName || undefined },
-    })
-    form.name = ''
-    form.iban = ''
-    form.bankName = ''
-    await refresh()
-  } catch (error) {
-    const payload = (error as { data?: { data?: { errors?: Record<string, string> } } }).data?.data
-    errors.value = payload?.errors ?? { form: 'Could not save the recipient.' }
-  } finally {
-    submitting.value = false
-  }
+  if (!created) return
+
+  toast.success('Recipient saved', form.name.trim())
+  form.name = ''
+  form.iban = ''
+  form.bankName = ''
+  await refresh()
 }
 
-async function removeBeneficiary(id: string) {
-  removingId.value = id
+async function confirmRemoval() {
+  if (!pendingRemoval.value) return
+
+  removing.value = true
 
   try {
-    await $fetch(`/api/beneficiaries/${id}`, { method: 'DELETE' })
+    await $fetch(`/api/beneficiaries/${pendingRemoval.value.id}`, { method: 'DELETE' })
+    toast.success('Recipient removed', pendingRemoval.value.name)
+    pendingRemoval.value = null
     await refresh()
-  } catch {
-    errors.value = { form: 'Could not remove the recipient.' }
+  } catch (error) {
+    toast.error('Could not remove recipient', extractApiError(error).message)
   } finally {
-    removingId.value = null
+    removing.value = false
   }
 }
 </script>
 
 <template>
   <div class="stack recipients-page">
-    <div>
+    <header>
       <h1>Recipients</h1>
       <p class="muted small">Save the people and businesses you pay regularly.</p>
-    </div>
+    </header>
 
-    <div v-if="errors.form" class="alert alert-error">{{ errors.form }}</div>
+    <div v-if="errors.form" class="alert alert-error" role="alert">{{ errors.form }}</div>
 
     <div class="recipients-grid">
       <form class="card stack" novalidate @submit.prevent="addBeneficiary">
         <h2 class="card-title">Add a recipient</h2>
 
-        <div class="field">
-          <label class="field-label" for="name">Name</label>
+        <FormField v-slot="field" label="Name" :error="errors.name">
           <input
-            id="name"
+            :id="field.id"
             v-model="form.name"
             class="input"
-            :class="{ 'has-error': errors.name }"
+            :class="{ 'has-error': field.invalid }"
+            :aria-invalid="field.invalid"
+            :aria-describedby="field.describedBy"
+            maxlength="120"
             placeholder="Jan Nowak"
-            required
           >
-          <span v-if="errors.name" class="field-error">{{ errors.name }}</span>
-        </div>
+        </FormField>
 
-        <div class="field">
-          <label class="field-label" for="iban">IBAN</label>
+        <FormField v-slot="field" label="IBAN" :error="errors.iban">
           <input
-            id="iban"
+            :id="field.id"
             v-model="form.iban"
             class="input mono"
-            :class="{ 'has-error': errors.iban }"
+            :class="{ 'has-error': field.invalid }"
+            :aria-invalid="field.invalid"
+            :aria-describedby="field.describedBy"
+            autocomplete="off"
             placeholder="PL00 0000 0000 0000 0000 0000 0000"
-            required
           >
-          <span v-if="errors.iban" class="field-error">{{ errors.iban }}</span>
-        </div>
+        </FormField>
 
-        <div class="field">
-          <label class="field-label" for="bankName">Bank <span class="muted">(optional)</span></label>
-          <input id="bankName" v-model="form.bankName" class="input" placeholder="Santander">
-        </div>
+        <FormField v-slot="field" label="Bank" :error="errors.bankName" optional>
+          <input
+            :id="field.id"
+            v-model="form.bankName"
+            class="input"
+            :aria-describedby="field.describedBy"
+            maxlength="120"
+            placeholder="Santander"
+          >
+        </FormField>
 
-        <button class="btn" type="submit" :disabled="submitting">
+        <button class="btn" type="submit" :disabled="submitting || !canSubmit">
+          <span v-if="submitting" class="spinner" aria-hidden="true" />
           {{ submitting ? 'Saving…' : 'Save recipient' }}
         </button>
       </form>
@@ -102,30 +119,35 @@ async function removeBeneficiary(id: string) {
           <span class="tiny muted">{{ beneficiaries.length }} total</span>
         </div>
 
-        <div v-if="pending" class="empty">Loading…</div>
+        <SkeletonBlock v-if="pending" :rows="4" height="40px" />
 
-        <div v-else-if="beneficiaries.length" class="stack list">
-          <div v-for="beneficiary in beneficiaries" :key="beneficiary.id" class="recipient-row">
+        <ul v-else-if="beneficiaries.length" class="list">
+          <li v-for="beneficiary in beneficiaries" :key="beneficiary.id" class="recipient-row">
             <div class="recipient-info">
               <p class="recipient-name truncate">{{ beneficiary.name }}</p>
               <p class="tiny muted mono truncate">{{ formatIban(beneficiary.iban) }}</p>
               <p v-if="beneficiary.bankName" class="tiny muted">{{ beneficiary.bankName }}</p>
             </div>
+
             <div class="row recipient-actions">
-              <NuxtLink :to="`/transfer?to=${beneficiary.iban}`" class="btn btn-secondary btn-sm">
+              <NuxtLink
+                :to="`/transfer?to=${beneficiary.iban}`"
+                class="btn btn-secondary btn-sm"
+                :aria-label="`Send money to ${beneficiary.name}`"
+              >
                 Send
               </NuxtLink>
               <button
                 class="btn btn-ghost btn-sm"
                 type="button"
-                :disabled="removingId === beneficiary.id"
-                @click="removeBeneficiary(beneficiary.id)"
+                :aria-label="`Remove ${beneficiary.name}`"
+                @click="pendingRemoval = { id: beneficiary.id, name: beneficiary.name }"
               >
-                {{ removingId === beneficiary.id ? '…' : 'Remove' }}
+                Remove
               </button>
             </div>
-          </div>
-        </div>
+          </li>
+        </ul>
 
         <EmptyState
           v-else
@@ -135,6 +157,17 @@ async function removeBeneficiary(id: string) {
         />
       </section>
     </div>
+
+    <ConfirmDialog
+      :open="pendingRemoval !== null"
+      title="Remove recipient?"
+      :description="`${pendingRemoval?.name} will be deleted from your saved recipients. Past transfers are not affected.`"
+      confirm-label="Remove"
+      tone="danger"
+      :pending="removing"
+      @confirm="confirmRemoval"
+      @cancel="pendingRemoval = null"
+    />
   </div>
 </template>
 
@@ -148,7 +181,7 @@ async function removeBeneficiary(id: string) {
   align-items: start;
 }
 
-.list { gap: 0; }
+.list { list-style: none; margin: 0; padding: 0; }
 
 .recipient-row {
   display: flex;
