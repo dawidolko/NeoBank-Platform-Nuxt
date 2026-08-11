@@ -332,127 +332,130 @@ async function main() {
     .map((person) => accounts.get(`${person.email}:main`))
     .filter((account): account is Account => Boolean(account) && account!.currency === 'PLN')
 
+  // Every event is collected first and booked in date order below. Writing them
+  // as they are generated would stamp `balanceAfterCents` in category order
+  // rather than chronological order, so statements would show a running balance
+  // that never matches the dates beside it.
+  const planned: LedgerOptions[] = []
+  const now = new Date()
+  const start = new Date(now)
+  start.setMonth(start.getMonth() - 9)
+
+  planned.push(
+    {
+      account: mainAccount,
+      amountCents: 1_250_000n, // 12 500.00 PLN
+      title: 'Opening balance',
+      type: 'DEPOSIT',
+      direction: 'CREDIT',
+      bookedAt: start,
+    },
+    {
+      account: eurAccount,
+      amountCents: 320_000n, // 3 200.00 EUR
+      title: 'Opening balance',
+      type: 'DEPOSIT',
+      direction: 'CREDIT',
+      bookedAt: start,
+    },
+  )
+
+  for (const peer of peerAccounts) {
+    planned.push({
+      account: peer,
+      amountCents: BigInt(randomInt(400_000, 900_000)),
+      title: 'Opening balance',
+      type: 'DEPOSIT',
+      direction: 'CREDIT',
+      bookedAt: start,
+    })
+  }
+
+  for (let monthsAgo = 8; monthsAgo >= 0; monthsAgo -= 1) {
+    const monthStart = new Date(now)
+    monthStart.setMonth(monthStart.getMonth() - monthsAgo)
+    monthStart.setDate(1)
+
+    const dayIn = (day: number, hour = 10) => {
+      const date = new Date(monthStart)
+      date.setDate(day)
+      date.setHours(hour, randomInt(0, 59), 0, 0)
+      return date > now ? now : date
+    }
+
+    planned.push({
+      account: mainAccount,
+      amountCents: BigInt(randomInt(890_000, 1_020_000)),
+      title: pick(INCOME_SOURCES),
+      type: 'DEPOSIT',
+      direction: 'CREDIT',
+      bookedAt: dayIn(10, 9),
+    })
+
+    planned.push({
+      account: mainAccount,
+      amountCents: 280_000n,
+      title: 'Monthly rent',
+      type: 'EXTERNAL',
+      direction: 'DEBIT',
+      bookedAt: dayIn(12, 8),
+      externalName: 'Property Management Ltd',
+      externalIban: 'PL61109010140000071219812874',
+    })
+
+    planned.push({
+      account: savingsAccount,
+      counterAccount: mainAccount,
+      amountCents: 100_000n,
+      title: 'Monthly savings',
+      type: 'INTERNAL',
+      direction: 'CREDIT',
+      bookedAt: dayIn(13, 7),
+    })
+
+    for (let i = 0; i < randomInt(9, 16); i += 1) {
+      planned.push({
+        account: mainAccount,
+        amountCents: BigInt(randomInt(1_200, 38_000)),
+        title: pick(SPEND_MERCHANTS),
+        type: 'EXTERNAL',
+        direction: 'DEBIT',
+        bookedAt: dayIn(randomInt(1, 28), randomInt(8, 21)),
+        externalName: 'Card payment',
+      })
+    }
+
+    if (peerAccounts.length > 0 && random() > 0.35) {
+      planned.push({
+        account: pick(peerAccounts),
+        counterAccount: mainAccount,
+        amountCents: BigInt(randomInt(5_000, 60_000)),
+        title: pick(['Dinner split', 'Concert tickets', 'Shared gift', 'Holiday deposit']),
+        type: 'INTERNAL',
+        direction: 'CREDIT',
+        bookedAt: dayIn(randomInt(14, 27), randomInt(12, 20)),
+      })
+    }
+
+    if (random() > 0.5) {
+      planned.push({
+        account: eurAccount,
+        amountCents: BigInt(randomInt(2_000, 25_000)),
+        title: pick(['Booking.com', 'Ryanair', 'Airbnb', 'Lufthansa']),
+        type: 'EXTERNAL',
+        direction: 'DEBIT',
+        bookedAt: dayIn(randomInt(5, 25), randomInt(9, 19)),
+        externalName: 'Card payment',
+      })
+    }
+  }
+
+  planned.sort((a, b) => a.bookedAt.getTime() - b.bookedAt.getTime())
+
   await prisma.$transaction(
     async (tx) => {
-      const now = new Date()
-      // Nine months of history, oldest first so running balances make sense.
-      const start = new Date(now)
-      start.setMonth(start.getMonth() - 9)
-
-      // Opening balances.
-      await bookTransfer(tx, balances, {
-        account: mainAccount,
-        amountCents: 1_250_000n, // 12 500.00 PLN
-        title: 'Opening balance',
-        type: 'DEPOSIT',
-        direction: 'CREDIT',
-        bookedAt: start,
-      })
-      await bookTransfer(tx, balances, {
-        account: eurAccount,
-        amountCents: 320_000n, // 3 200.00 EUR
-        title: 'Opening balance',
-        type: 'DEPOSIT',
-        direction: 'CREDIT',
-        bookedAt: start,
-      })
-
-      for (const peer of peerAccounts) {
-        await bookTransfer(tx, balances, {
-          account: peer,
-          amountCents: BigInt(randomInt(400_000, 900_000)),
-          title: 'Opening balance',
-          type: 'DEPOSIT',
-          direction: 'CREDIT',
-          bookedAt: start,
-        })
-      }
-
-      // Month-by-month activity.
-      for (let monthsAgo = 8; monthsAgo >= 0; monthsAgo -= 1) {
-        const monthStart = new Date(now)
-        monthStart.setMonth(monthStart.getMonth() - monthsAgo)
-        monthStart.setDate(1)
-
-        const dayIn = (day: number, hour = 10) => {
-          const date = new Date(monthStart)
-          date.setDate(day)
-          date.setHours(hour, randomInt(0, 59), 0, 0)
-          return date > now ? now : date
-        }
-
-        // Salary on the 10th.
-        await bookTransfer(tx, balances, {
-          account: mainAccount,
-          amountCents: BigInt(randomInt(890_000, 1_020_000)),
-          title: pick(INCOME_SOURCES),
-          type: 'DEPOSIT',
-          direction: 'CREDIT',
-          bookedAt: dayIn(10, 9),
-        })
-
-        // Rent on the 12th.
-        await bookTransfer(tx, balances, {
-          account: mainAccount,
-          amountCents: 280_000n,
-          title: 'Monthly rent',
-          type: 'EXTERNAL',
-          direction: 'DEBIT',
-          bookedAt: dayIn(12, 8),
-          externalName: 'Property Management Ltd',
-          externalIban: 'PL61109010140000071219812874',
-        })
-
-        // Standing transfer to savings.
-        await bookTransfer(tx, balances, {
-          account: savingsAccount,
-          counterAccount: mainAccount,
-          amountCents: 100_000n,
-          title: 'Monthly savings',
-          type: 'INTERNAL',
-          direction: 'CREDIT',
-          bookedAt: dayIn(13, 7),
-        })
-
-        // Everyday card spending.
-        for (let i = 0; i < randomInt(9, 16); i += 1) {
-          await bookTransfer(tx, balances, {
-            account: mainAccount,
-            amountCents: BigInt(randomInt(1_200, 38_000)),
-            title: pick(SPEND_MERCHANTS),
-            type: 'EXTERNAL',
-            direction: 'DEBIT',
-            bookedAt: dayIn(randomInt(1, 28), randomInt(8, 21)),
-            externalName: 'Card payment',
-          })
-        }
-
-        // A peer-to-peer transfer most months.
-        if (peerAccounts.length > 0 && random() > 0.35) {
-          const peer = pick(peerAccounts)
-          await bookTransfer(tx, balances, {
-            account: peer,
-            counterAccount: mainAccount,
-            amountCents: BigInt(randomInt(5_000, 60_000)),
-            title: pick(['Dinner split', 'Concert tickets', 'Shared gift', 'Holiday deposit']),
-            type: 'INTERNAL',
-            direction: 'CREDIT',
-            bookedAt: dayIn(randomInt(14, 27), randomInt(12, 20)),
-          })
-        }
-
-        // Occasional EUR spending.
-        if (random() > 0.5) {
-          await bookTransfer(tx, balances, {
-            account: eurAccount,
-            amountCents: BigInt(randomInt(2_000, 25_000)),
-            title: pick(['Booking.com', 'Ryanair', 'Airbnb', 'Lufthansa']),
-            type: 'EXTERNAL',
-            direction: 'DEBIT',
-            bookedAt: dayIn(randomInt(5, 25), randomInt(9, 19)),
-            externalName: 'Card payment',
-          })
-        }
+      for (const event of planned) {
+        await bookTransfer(tx, balances, event)
       }
 
       // Persist the final running balances.
