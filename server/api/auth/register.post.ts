@@ -1,10 +1,13 @@
 import { prisma } from '../../utils/prisma'
 import { createSession, hashPassword } from '../../utils/auth'
 import { parseOrThrow, registerSchema } from '../../utils/validation'
+import { enforceRateLimit } from '../../utils/rateLimit'
 import { generateIban } from '../../utils/iban'
 import { recordAudit } from '../../services/audit'
 
 export default defineEventHandler(async (event) => {
+  enforceRateLimit(event, { key: 'register', limit: 3, windowMs: 600_000 })
+
   const input = parseOrThrow(registerSchema, await readBody(event))
 
   const existing = await prisma.user.findUnique({ where: { email: input.email } })

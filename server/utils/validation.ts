@@ -54,6 +54,38 @@ export const depositSchema = z.object({
   title: z.string().trim().min(3).max(140).default('Deposit'),
 })
 
+export const profileUpdateSchema = z.object({
+  firstName: z.string().trim().min(2, 'First name is too short').max(60),
+  lastName: z.string().trim().min(2, 'Last name is too short').max(60),
+  phone: z
+    .string()
+    .trim()
+    .regex(/^\+?[\d\s-]{7,20}$/, 'Enter a valid phone number')
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+})
+
+export const passwordChangeSchema = z
+  .object({
+    currentPassword: z.string().min(1, 'Enter your current password'),
+    newPassword: password,
+    confirmPassword: z.string().min(1, 'Repeat the new password'),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  })
+
+export const statementExportSchema = z.object({
+  accountId: z.string().uuid().optional(),
+  from: z.string().date().optional(),
+  to: z.string().date().optional(),
+})
+
+export const accountRenameSchema = z.object({
+  name: z.string().trim().min(2, 'Give the account a name').max(60),
+})
+
 export const accountCreateSchema = z.object({
   name: z.string().trim().min(2, 'Give the account a name').max(60),
   type: z.enum(['CHECKING', 'SAVINGS', 'CREDIT']).default('CHECKING'),

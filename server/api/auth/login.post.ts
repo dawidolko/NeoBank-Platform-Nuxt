@@ -1,6 +1,7 @@
 import { prisma } from '../../utils/prisma'
 import { createSession, verifyPassword } from '../../utils/auth'
 import { loginSchema, parseOrThrow } from '../../utils/validation'
+import { clearRateLimit, enforceRateLimit } from '../../utils/rateLimit'
 import { recordAuditSafe } from '../../services/audit'
 
 /** Same message for "no such user" and "wrong password" — no account enumeration. */
@@ -17,6 +18,11 @@ const TIMING_EQUALIZER_HASH =
 export default defineEventHandler(async (event) => {
   const input = parseOrThrow(loginSchema, await readBody(event))
   const ipAddress = getRequestIP(event, { xForwardedFor: true })
+
+  // Throttled per IP+email so one targeted account cannot be brute-forced, and
+  // per IP alone so a spray across many accounts is also capped.
+  enforceRateLimit(event, { key: 'login', limit: 5, windowMs: 60_000, identifier: input.email })
+  enforceRateLimit(event, { key: 'login-ip', limit: 20, windowMs: 60_000 })
 
   const user = await prisma.user.findUnique({ where: { email: input.email } })
 
@@ -55,6 +61,8 @@ export default defineEventHandler(async (event) => {
       },
     })
   }
+
+  clearRateLimit(event, 'login', input.email)
 
   await createSession(event, user.id)
 

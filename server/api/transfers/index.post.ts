@@ -3,10 +3,14 @@ import { parseOrThrow, transferSchema } from '../../utils/validation'
 import { parseAmountToCents } from '../../utils/money'
 import { serializeBigInt } from '../../utils/serialize'
 import { executeTransfer, TransferError } from '../../services/transfers'
+import { enforceRateLimit } from '../../utils/rateLimit'
 import { prisma } from '../../utils/prisma'
 
 export default defineEventHandler(async (event) => {
   const user = requireUser(event)
+
+  enforceRateLimit(event, { key: 'transfer', limit: 20, windowMs: 60_000, identifier: user.id })
+
   const input = parseOrThrow(transferSchema, await readBody(event))
 
   // Amount is parsed in the source account's currency, so scale is correct.
