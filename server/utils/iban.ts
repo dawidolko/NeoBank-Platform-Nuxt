@@ -56,7 +56,10 @@ export function isValidIban(input: string): boolean {
   return mod97(toNumericForm(iban)) === 1
 }
 
-/** Group into 4-character blocks for display: "PL10 2030 4000 ...". */
+/**
+ * Group into 4-character blocks for display: "PL10 2030 4000 ...".
+ * Shared with the client via `useFormat().iban` so both sides group identically.
+ */
 export function formatIban(input: string): string {
   return normalizeIban(input).replace(/(.{4})/g, '$1 ').trim()
 }

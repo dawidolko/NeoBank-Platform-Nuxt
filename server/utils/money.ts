@@ -58,17 +58,6 @@ export function centsToDecimalString(cents: bigint, currency: CurrencyCode = 'PL
   return `${negative ? '-' : ''}${whole}.${fraction}`
 }
 
-/** Locale-aware display string, e.g. "1 234,56 zł". */
-export function formatMoney(cents: bigint, currency: CurrencyCode = 'PLN'): string {
-  const value = Number(centsToDecimalString(cents, currency))
-
-  return new Intl.NumberFormat('en-GB', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: CURRENCY_MINOR_UNITS[currency],
-  }).format(value)
-}
-
 /**
  * Would this debit push the account past its overdraft limit?
  * Balance and overdraft are both minor units; overdraft is a positive allowance.

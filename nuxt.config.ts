@@ -38,7 +38,6 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
-    sessionSecret: '', // NUXT_SESSION_SECRET
     sessionTtlHours: '720', // NUXT_SESSION_TTL_HOURS — 30 days
     public: {
       appName: 'NeoBank',

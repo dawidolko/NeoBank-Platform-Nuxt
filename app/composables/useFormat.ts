@@ -58,10 +58,14 @@ export function useFormat() {
     return date(value)
   }
 
+  /**
+   * Normalizes before grouping, so a value typed with stray spaces or in
+   * lowercase renders the same as one straight from the database.
+   */
   function iban(value: string | null | undefined): string {
     if (!value) return '—'
 
-    return value.replace(/(.{4})/g, '$1 ').trim()
+    return value.replace(/\s+/g, '').toUpperCase().replace(/(.{4})/g, '$1 ').trim()
   }
 
   /** Mask all but the last four characters: "•••• 2874". */

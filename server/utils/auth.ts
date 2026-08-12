@@ -1,4 +1,4 @@
-import { randomBytes, createHash, timingSafeEqual } from 'node:crypto'
+import { randomBytes, createHash } from 'node:crypto'
 import argon2 from 'argon2'
 import type { H3Event } from 'h3'
 import type { Role, User } from '@prisma/client'
@@ -41,16 +41,6 @@ export function generateSessionToken(): string {
 
 export function hashSessionToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
-}
-
-/** Constant-time compare for two hex digests of equal length. */
-export function safeCompare(a: string, b: string): boolean {
-  const bufferA = Buffer.from(a, 'utf8')
-  const bufferB = Buffer.from(b, 'utf8')
-
-  if (bufferA.length !== bufferB.length) return false
-
-  return timingSafeEqual(bufferA, bufferB)
 }
 
 export type SessionUser = Pick<
