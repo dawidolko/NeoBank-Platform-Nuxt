@@ -1,4 +1,5 @@
 import { requireUser } from '../../utils/auth'
+import { enforceRateLimit } from '../../utils/rateLimit'
 import { depositSchema, parseOrThrow } from '../../utils/validation'
 import { parseAmountToCents } from '../../utils/money'
 import { serializeBigInt } from '../../utils/serialize'
@@ -11,6 +12,8 @@ import { prisma } from '../../utils/prisma'
  */
 export default defineEventHandler(async (event) => {
   const user = requireUser(event)
+
+  enforceRateLimit(event, { key: 'deposit', limit: 10, windowMs: 60000, identifier: user.id })
   const input = parseOrThrow(depositSchema, await readBody(event))
 
   const account = await prisma.account.findFirst({

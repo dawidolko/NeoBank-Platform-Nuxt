@@ -135,7 +135,7 @@ function summarize(metadata: unknown): string {
 
       <EmptyState
         v-else
-        icon="📋"
+        icon="receipt"
         :title="hasFilters ? 'No matching events' : 'Audit log is empty'"
         :description="hasFilters ? 'Try clearing the filters.' : undefined"
       />

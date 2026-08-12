@@ -1,3 +1,4 @@
+import { paginate } from '../../utils/pagination'
 import { prisma } from '../../utils/prisma'
 import { requireRole } from '../../utils/auth'
 import { adminAuditQuerySchema, parseOrThrow } from '../../utils/validation'
@@ -16,19 +17,24 @@ export default defineEventHandler(async (event) => {
     ...(entityType ? { entityType } : {}),
   }
 
-  const [total, logs] = await Promise.all([
-    prisma.auditLog.count({ where }),
-    prisma.auditLog.findMany({
+  const total = await prisma.auditLog.count({ where })
+  const pagination = paginate(total, page, perPage)
+
+  const logs = await prisma.auditLog.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * perPage,
-      take: perPage,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      skip: pagination.skip,
+      take: pagination.perPage,
       include: { user: { select: { email: true, firstName: true, lastName: true } } },
-    }),
-  ])
+    })
 
   return serializeBigInt({
     logs,
-    pagination: { page, perPage, total, pages: Math.ceil(total / perPage) },
+    pagination: {
+      page: pagination.page,
+      perPage: pagination.perPage,
+      total: pagination.total,
+      pages: pagination.pages,
+    },
   })
 })

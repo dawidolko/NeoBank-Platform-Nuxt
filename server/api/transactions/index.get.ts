@@ -1,4 +1,5 @@
 import type { Prisma } from '@prisma/client'
+import { paginate } from '../../utils/pagination'
 import { prisma } from '../../utils/prisma'
 import { requireUser } from '../../utils/auth'
 import { parseOrThrow, transactionQuerySchema } from '../../utils/validation'
@@ -54,13 +55,14 @@ export default defineEventHandler(async (event) => {
       : {}),
   }
 
-  const [total, entries] = await Promise.all([
-    prisma.entry.count({ where }),
-    prisma.entry.findMany({
+  const total = await prisma.entry.count({ where })
+  const pagination = paginate(total, query.page, query.perPage)
+
+  const entries = await prisma.entry.findMany({
       where,
-      orderBy: { bookedAt: 'desc' },
-      skip: (query.page - 1) * query.perPage,
-      take: query.perPage,
+      orderBy: [{ bookedAt: 'desc' }, { id: 'desc' }],
+      skip: pagination.skip,
+      take: pagination.perPage,
       include: {
         account: { select: { id: true, name: true, iban: true, currency: true } },
         transfer: {
@@ -70,16 +72,15 @@ export default defineEventHandler(async (event) => {
           },
         },
       },
-    }),
-  ])
+    })
 
   return serializeBigInt({
     transactions: entries,
     pagination: {
-      page: query.page,
-      perPage: query.perPage,
-      total,
-      pages: Math.ceil(total / query.perPage),
+      page: pagination.page,
+      perPage: pagination.perPage,
+      total: pagination.total,
+      pages: pagination.pages,
     },
   })
 })

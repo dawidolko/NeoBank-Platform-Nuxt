@@ -1,4 +1,5 @@
 import type { Prisma } from '@prisma/client'
+import { paginate } from '../../../utils/pagination'
 import { prisma } from '../../../utils/prisma'
 import { requireRole } from '../../../utils/auth'
 import { adminUserQuerySchema, parseOrThrow } from '../../../utils/validation'
@@ -19,13 +20,14 @@ export default defineEventHandler(async (event) => {
       }
     : {}
 
-  const [total, users] = await Promise.all([
-    prisma.user.count({ where }),
-    prisma.user.findMany({
+  const total = await prisma.user.count({ where })
+  const pagination = paginate(total, page, perPage)
+
+  const users = await prisma.user.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * perPage,
-      take: perPage,
+      skip: pagination.skip,
+      take: pagination.perPage,
       select: {
         id: true,
         email: true,
@@ -36,11 +38,15 @@ export default defineEventHandler(async (event) => {
         createdAt: true,
         accounts: { select: { id: true, balanceCents: true, currency: true } },
       },
-    }),
-  ])
+    })
 
   return serializeBigInt({
     users,
-    pagination: { page, perPage, total, pages: Math.ceil(total / perPage) },
+    pagination: {
+      page: pagination.page,
+      perPage: pagination.perPage,
+      total: pagination.total,
+      pages: pagination.pages,
+    },
   })
 })

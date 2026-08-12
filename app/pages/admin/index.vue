@@ -81,7 +81,7 @@ const recent = computed(() => data.value?.recentTransfers ?? [])
             </div>
           </div>
 
-          <EmptyState v-else icon="📭" title="No transfers yet" />
+          <EmptyState v-else icon="inbox" title="No transfers yet" />
         </section>
       </div>
     </template>

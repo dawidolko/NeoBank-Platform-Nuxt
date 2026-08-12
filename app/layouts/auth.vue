@@ -94,10 +94,15 @@
 }
 
 .aside-list li::before {
-  content: '✓';
+  content: '';
   position: absolute;
   left: 0;
-  font-weight: 700;
+  top: 0.5em;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentcolor;
+  opacity: 0.85;
 }
 
 @media (max-width: 900px) {

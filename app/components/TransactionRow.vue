@@ -43,8 +43,8 @@ const counterparty = computed(() => forEntry(props.entry.transfer, props.entry.d
     class="tx-row"
     :class="{ 'tx-link': to }"
   >
-    <span class="tx-icon" :class="isCredit ? 'tx-in' : 'tx-out'" aria-hidden="true">
-      {{ isCredit ? '↓' : '↑' }}
+    <span class="tx-icon" :class="isCredit ? 'tx-in' : 'tx-out'">
+      <AppIcon :name="isCredit ? 'arrow-down-left' : 'arrow-up-right'" :size="16" />
     </span>
     <span class="visually-hidden">{{ isCredit ? 'Money in' : 'Money out' }}</span>
 

@@ -376,11 +376,18 @@ async function main() {
     monthStart.setMonth(monthStart.getMonth() - monthsAgo)
     monthStart.setDate(1)
 
+    // Days still in the future for the current month are folded back into the
+    // days that have already happened. Clamping them to `now` instead would
+    // stack a dozen events on one timestamp, so the statement would show a
+    // whole month of activity all labelled "Today".
     const dayIn = (day: number, hour = 10) => {
+      const daysAvailable = monthsAgo === 0 ? now.getDate() : 28
       const date = new Date(monthStart)
-      date.setDate(day)
-      date.setHours(hour, randomInt(0, 59), 0, 0)
-      return date > now ? now : date
+
+      date.setDate(((day - 1) % daysAvailable) + 1)
+      date.setHours(hour, randomInt(0, 59), randomInt(0, 59), 0)
+
+      return date > now ? new Date(now.getTime() - randomInt(1, 240) * 60_000) : date
     }
 
     planned.push({

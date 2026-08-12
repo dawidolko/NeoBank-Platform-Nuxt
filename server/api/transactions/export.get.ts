@@ -1,20 +1,31 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '../../utils/prisma'
 import { requireUser } from '../../utils/auth'
+import { enforceRateLimit } from '../../utils/rateLimit'
 import { parseOrThrow, statementExportSchema } from '../../utils/validation'
 import { centsToDecimalString, type CurrencyCode } from '../../utils/money'
 
 const MAX_ROWS = 10_000
 
-/** RFC 4180 quoting so titles containing commas or quotes survive the round trip. */
+/**
+ * RFC 4180 quoting, plus neutralisation of spreadsheet formula injection.
+ *
+ * A transfer titled `=HYPERLINK(...)` is user-controlled text; Excel and Sheets
+ * execute a leading =, +, - or @ as a formula on open, so it is prefixed with a
+ * tab that the spreadsheet strips but the parser keeps as data.
+ */
 function csvCell(value: string | number | null | undefined): string {
-  const text = String(value ?? '')
+  let text = String(value ?? '')
 
-  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+  if (/^[=+\-@\t\r]/.test(text)) text = `\t${text}`
+
+  return /[",\n\r\t]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
 }
 
 export default defineEventHandler(async (event) => {
   const user = requireUser(event)
+
+  enforceRateLimit(event, { key: 'export', limit: 5, windowMs: 60000, identifier: user.id })
   const query = parseOrThrow(statementExportSchema, getQuery(event))
 
   const owned = await prisma.account.findMany({
@@ -56,6 +67,12 @@ export default defineEventHandler(async (event) => {
           status: true,
           externalName: true,
           externalIban: true,
+          sourceAccount: {
+            select: { iban: true, user: { select: { firstName: true, lastName: true } } },
+          },
+          destinationAccount: {
+            select: { iban: true, user: { select: { firstName: true, lastName: true } } },
+          },
         },
       },
     },
@@ -76,12 +93,28 @@ export default defineEventHandler(async (event) => {
     'Balance after',
   ]
 
+  /** Same resolution order the UI uses, so the export matches the screen. */
+  function counterpartyOf(entry: (typeof entries)[number]): string {
+    const { transfer } = entry
+
+    if (transfer.externalName) return transfer.externalName
+
+    const other =
+      entry.direction === 'CREDIT' ? transfer.sourceAccount : transfer.destinationAccount
+
+    if (other?.user) return `${other.user.firstName} ${other.user.lastName}`
+    if (transfer.type === 'DEPOSIT') return 'Incoming payment'
+    if (transfer.type === 'WITHDRAWAL') return 'Cash withdrawal'
+
+    return 'External account'
+  }
+
   const rows = entries.map((entry) =>
     [
       entry.bookedAt.toISOString(),
       entry.transfer.reference,
       entry.transfer.title,
-      entry.transfer.externalName ?? '',
+      counterpartyOf(entry),
       entry.account.name,
       entry.account.iban,
       entry.transfer.type,

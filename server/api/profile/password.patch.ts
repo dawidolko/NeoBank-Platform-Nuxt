@@ -1,10 +1,13 @@
 import { prisma } from '../../utils/prisma'
 import { hashPassword, requireUser, verifyPassword, SESSION_COOKIE, hashSessionToken } from '../../utils/auth'
+import { enforceRateLimit } from '../../utils/rateLimit'
 import { parseOrThrow, passwordChangeSchema } from '../../utils/validation'
 import { recordAudit } from '../../services/audit'
 
 export default defineEventHandler(async (event) => {
   const current = requireUser(event)
+
+  enforceRateLimit(event, { key: 'password-change', limit: 5, windowMs: 600000, identifier: current.id })
   const input = parseOrThrow(passwordChangeSchema, await readBody(event))
 
   const user = await prisma.user.findUniqueOrThrow({ where: { id: current.id } })

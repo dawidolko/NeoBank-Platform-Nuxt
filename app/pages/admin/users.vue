@@ -190,7 +190,7 @@ async function applyAction() {
         />
       </template>
 
-      <EmptyState v-else icon="🔍" title="No users found" description="Try a different search." />
+      <EmptyState v-else icon="search" title="No users found" description="Try a different search." />
     </section>
 
     <ConfirmDialog

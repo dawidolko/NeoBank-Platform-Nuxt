@@ -139,7 +139,7 @@ async function createAccount() {
 
     <div v-else class="card">
       <EmptyState
-        icon="🏦"
+        icon="landmark"
         title="No accounts yet"
         description="Open your first account to start moving money."
       >

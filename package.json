@@ -29,6 +29,7 @@
     "db:verify": "tsx scripts/verify-ledger.ts"
   },
   "dependencies": {
+    "@nuxt/fonts": "^0.11.4",
     "@prisma/client": "^6.3.1",
     "argon2": "^0.41.1",
     "nuxt": "^4.0.0",

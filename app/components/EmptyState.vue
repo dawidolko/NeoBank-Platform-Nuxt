@@ -1,16 +1,19 @@
 <script setup lang="ts">
-defineProps<{
-  icon?: string
-  title: string
-  description?: string
-}>()
+withDefaults(
+  defineProps<{
+    icon?: string
+    title: string
+    description?: string
+  }>(),
+  { icon: 'inbox', description: undefined },
+)
 </script>
 
 <template>
   <div class="empty">
-    <div class="empty-icon">{{ icon ?? '📭' }}</div>
+    <span class="empty-icon"><AppIcon :name="icon as never" :size="26" /></span>
     <p class="empty-title">{{ title }}</p>
-    <p v-if="description" class="small muted">{{ description }}</p>
+    <p v-if="description" class="small muted empty-text">{{ description }}</p>
     <div v-if="$slots.action" class="empty-action">
       <slot name="action" />
     </div>
@@ -18,6 +21,20 @@ defineProps<{
 </template>
 
 <style scoped>
-.empty-title { font-weight: 600; color: var(--text); margin-bottom: 4px; }
-.empty-action { margin-top: 16px; }
+.empty { display: flex; flex-direction: column; align-items: center; }
+
+.empty-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: var(--space-4);
+  border-radius: var(--radius-full);
+  background: var(--surface-muted);
+  color: var(--text-subtle);
+}
+
+.empty-title { font-weight: var(--weight-semibold); color: var(--text); }
+.empty-text { max-width: 40ch; margin-top: var(--space-1); }
+.empty-action { margin-top: var(--space-4); }
 </style>

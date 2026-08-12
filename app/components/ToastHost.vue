@@ -2,9 +2,9 @@
 const { toasts, dismiss } = useToast()
 
 const ICONS = {
-  success: '✓',
-  error: '!',
-  info: 'i',
+  success: 'check-circle',
+  error: 'alert-circle',
+  info: 'info',
 } as const
 </script>
 
@@ -13,7 +13,7 @@ const ICONS = {
     <div class="toast-host" role="status" aria-live="polite">
       <TransitionGroup name="toast">
         <div v-for="toast in toasts" :key="toast.id" class="toast" :class="`toast-${toast.tone}`">
-          <span class="toast-icon" aria-hidden="true">{{ ICONS[toast.tone] }}</span>
+          <span class="toast-icon"><AppIcon :name="ICONS[toast.tone]" :size="17" /></span>
           <div class="toast-body">
             <p class="toast-title">{{ toast.title }}</p>
             <p v-if="toast.description" class="toast-description">{{ toast.description }}</p>
@@ -24,7 +24,7 @@ const ICONS = {
             aria-label="Dismiss notification"
             @click="dismiss(toast.id)"
           >
-            ×
+            <AppIcon name="x" :size="15" />
           </button>
         </div>
       </TransitionGroup>
@@ -37,7 +37,7 @@ const ICONS = {
   position: fixed;
   top: 16px;
   right: 16px;
-  z-index: 100;
+  z-index: var(--z-toast);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -53,7 +53,7 @@ const ICONS = {
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--surface);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-lg);
   pointer-events: auto;
 }
 
@@ -86,11 +86,12 @@ const ICONS = {
   border: 0;
   background: transparent;
   color: var(--text-muted);
-  font-size: 1.2rem;
   line-height: 1;
   cursor: pointer;
-  padding: 0 2px;
-  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  padding: var(--space-1);
+  border-radius: var(--radius-xs);
 }
 
 .toast-close:hover { color: var(--text); }

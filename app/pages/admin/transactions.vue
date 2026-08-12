@@ -92,7 +92,7 @@ watch([search, status], () => { page.value = 1 })
         />
       </template>
 
-      <EmptyState v-else icon="🔍" title="No transfers found" />
+      <EmptyState v-else icon="search" title="No transfers found" />
     </section>
   </div>
 </template>

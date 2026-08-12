@@ -74,7 +74,7 @@ onUnmounted(() => {
           <div class="modal-header">
             <h2 :id="titleId" class="modal-title">{{ title }}</h2>
             <button class="modal-close" type="button" aria-label="Close dialog" @click="emit('close')">
-              ×
+              <AppIcon name="x" :size="18" />
             </button>
           </div>
 
@@ -97,11 +97,11 @@ onUnmounted(() => {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 90;
+  z-index: var(--z-modal);
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgb(9 12 20 / 55%);
+  background: rgb(6 9 16 / 62%);
   backdrop-filter: blur(2px);
 }
 
@@ -110,8 +110,8 @@ onUnmounted(() => {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 22px;
+  box-shadow: var(--shadow-xl);
+  padding: var(--space-6);
   max-height: calc(100vh - 40px);
   overflow-y: auto;
 }
@@ -132,11 +132,12 @@ onUnmounted(() => {
   border: 0;
   background: transparent;
   color: var(--text-muted);
-  font-size: 1.5rem;
   line-height: 1;
   cursor: pointer;
-  padding: 0 3px;
-  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  padding: var(--space-1);
+  border-radius: var(--radius-xs);
 }
 
 .modal-close:hover { color: var(--text); }

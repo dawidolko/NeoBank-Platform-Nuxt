@@ -108,7 +108,7 @@ async function confirmClose() {
 
   <div v-else-if="!account" class="card">
     <EmptyState
-      icon="🔍"
+      icon="search"
       title="Account not found"
       :description="
         error?.statusCode === 404
@@ -125,14 +125,17 @@ async function confirmClose() {
   <div v-else class="stack">
     <div class="row-between">
       <div>
-        <NuxtLink to="/accounts" class="small">← All accounts</NuxtLink>
+        <NuxtLink to="/accounts" class="small link-back">
+          <AppIcon name="arrow-left" :size="14" /> All accounts
+        </NuxtLink>
         <h1>{{ account.name }}</h1>
         <p class="muted small mono">{{ iban(account.iban) }}</p>
       </div>
 
       <div class="row">
         <button class="btn btn-secondary btn-sm" type="button" @click="copyIban">
-          {{ copied ? 'Copied ✓' : 'Copy IBAN' }}
+          <AppIcon :name="copied ? 'check' : 'copy'" :size="14" />
+          {{ copied ? 'Copied' : 'Copy IBAN' }}
         </button>
         <button class="btn btn-secondary btn-sm" type="button" @click="startRename">Rename</button>
         <NuxtLink
@@ -180,7 +183,7 @@ async function confirmClose() {
           />
         </div>
 
-        <EmptyState v-else icon="📭" title="No activity yet" />
+        <EmptyState v-else icon="inbox" title="No activity yet" />
       </section>
 
       <div class="stack">
@@ -205,7 +208,7 @@ async function confirmClose() {
             </div>
           </div>
 
-          <EmptyState v-else icon="💳" title="No cards issued" />
+          <EmptyState v-else icon="credit-card" title="No cards issued" />
         </section>
 
         <section v-if="account.status === 'ACTIVE'" class="card stack">

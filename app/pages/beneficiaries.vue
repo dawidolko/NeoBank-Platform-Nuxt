@@ -151,7 +151,7 @@ async function confirmRemoval() {
 
         <EmptyState
           v-else
-          icon="👤"
+          icon="users"
           title="No recipients saved"
           description="Add one using the form to speed up future transfers."
         />

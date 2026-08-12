@@ -211,7 +211,7 @@ const exportUrl = computed(() => {
 
       <EmptyState
         v-else
-        icon="🔍"
+        icon="search"
         title="No transactions found"
         :description="
           hasFilters

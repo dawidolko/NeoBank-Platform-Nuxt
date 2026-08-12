@@ -1,0 +1,13 @@
+{
+  "name": "NeoBank — Digital Banking Platform",
+  "short_name": "NeoBank",
+  "description": "Multi-currency accounts, instant transfers and a complete transaction history.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0a0d14",
+  "theme_color": "#3b5bfd",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

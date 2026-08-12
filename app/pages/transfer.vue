@@ -156,7 +156,7 @@ async function onSubmit() {
 
     <div v-if="openAccounts.length === 0" class="card">
       <EmptyState
-        icon="🏦"
+        icon="landmark"
         title="No open accounts"
         description="Open an account before sending money."
       >
@@ -290,7 +290,7 @@ async function onSubmit() {
 
           <EmptyState
             v-else
-            icon="👤"
+            icon="users"
             title="No saved recipients"
             description="Save the people you pay often."
           />

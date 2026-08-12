@@ -5,14 +5,14 @@ const menuOpen = ref(false)
 
 const navigation = computed(() => {
   const links = [
-    { to: '/dashboard', label: 'Overview' },
-    { to: '/accounts', label: 'Accounts' },
-    { to: '/transfer', label: 'Send money' },
-    { to: '/transactions', label: 'Transactions' },
-    { to: '/beneficiaries', label: 'Recipients' },
+    { to: '/dashboard', label: 'Overview', icon: 'home' },
+    { to: '/accounts', label: 'Accounts', icon: 'wallet' },
+    { to: '/transfer', label: 'Send money', icon: 'send' },
+    { to: '/transactions', label: 'Transactions', icon: 'receipt' },
+    { to: '/beneficiaries', label: 'Recipients', icon: 'users' },
   ]
 
-  if (isAdmin.value) links.push({ to: '/admin', label: 'Admin' })
+  if (isAdmin.value) links.push({ to: '/admin', label: 'Admin', icon: 'shield' })
 
   return links
 })
@@ -46,6 +46,7 @@ watch(() => route.fullPath, () => { menuOpen.value = false })
             class="nav-link"
             :class="{ 'nav-link-active': isActive(link.to) }"
           >
+            <AppIcon :name="link.icon as never" :size="16" />
             {{ link.label }}
           </NuxtLink>
         </nav>
@@ -58,7 +59,16 @@ watch(() => route.fullPath, () => { menuOpen.value = false })
               <span class="tiny muted">{{ isAdmin ? 'Administrator' : 'Customer' }}</span>
             </span>
           </NuxtLink>
-          <button class="btn btn-ghost btn-sm" type="button" @click="logout()">Sign out</button>
+          <ThemeToggle />
+          <button
+            class="btn btn-ghost btn-icon"
+            type="button"
+            aria-label="Sign out"
+            title="Sign out"
+            @click="logout()"
+          >
+            <AppIcon name="log-out" :size="17" />
+          </button>
           <button
             class="menu-toggle btn btn-ghost btn-sm"
             type="button"
@@ -67,7 +77,7 @@ watch(() => route.fullPath, () => { menuOpen.value = false })
             aria-label="Toggle navigation"
             @click="menuOpen = !menuOpen"
           >
-            <span aria-hidden="true">☰</span>
+            <AppIcon name="menu" :size="18" />
           </button>
         </div>
       </div>
@@ -96,11 +106,12 @@ watch(() => route.fullPath, () => { menuOpen.value = false })
 }
 
 .topbar {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: var(--z-sticky);
+  background: color-mix(in srgb, var(--surface) 84%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
 }
 
 .topbar-inner {
@@ -144,7 +155,10 @@ watch(() => route.fullPath, () => { menuOpen.value = false })
 }
 
 .nav-link {
-  padding: 7px 12px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 7px var(--space-3);
   border-radius: var(--radius-sm);
   color: var(--text-muted);
   font-size: 0.87rem;

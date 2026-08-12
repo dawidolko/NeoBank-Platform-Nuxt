@@ -74,7 +74,7 @@ async function copyReference() {
   <div v-else-if="!entry || !transfer" class="detail-page">
     <div class="card">
       <EmptyState
-        icon="🔍"
+        icon="search"
         title="Transaction not found"
         :description="
           error?.statusCode === 404
@@ -98,8 +98,8 @@ async function copyReference() {
 
     <section class="card receipt">
       <div class="receipt-head">
-        <span class="tx-icon" :class="isCredit ? 'tx-in' : 'tx-out'" aria-hidden="true">
-          {{ isCredit ? '↓' : '↑' }}
+        <span class="tx-icon" :class="isCredit ? 'tx-in' : 'tx-out'">
+          <AppIcon :name="isCredit ? 'arrow-down-left' : 'arrow-up-right'" :size="20" />
         </span>
         <div>
           <p class="receipt-amount numeric" :class="isCredit ? 'amount-positive' : ''">

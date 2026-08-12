@@ -1,4 +1,5 @@
 import type { Prisma } from '@prisma/client'
+import { paginate } from '../../utils/pagination'
 import { prisma } from '../../utils/prisma'
 import { requireRole } from '../../utils/auth'
 import { adminTransferQuerySchema, parseOrThrow } from '../../utils/validation'
@@ -26,13 +27,14 @@ export default defineEventHandler(async (event) => {
       : {}),
   }
 
-  const [total, transfers] = await Promise.all([
-    prisma.transfer.count({ where }),
-    prisma.transfer.findMany({
+  const total = await prisma.transfer.count({ where })
+  const pagination = paginate(total, page, perPage)
+
+  const transfers = await prisma.transfer.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * perPage,
-      take: perPage,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      skip: pagination.skip,
+      take: pagination.perPage,
       include: {
         sourceAccount: {
           select: { iban: true, name: true, user: { select: { firstName: true, lastName: true, email: true } } },
@@ -41,11 +43,15 @@ export default defineEventHandler(async (event) => {
           select: { iban: true, name: true, user: { select: { firstName: true, lastName: true, email: true } } },
         },
       },
-    }),
-  ])
+    })
 
   return serializeBigInt({
     transfers,
-    pagination: { page, perPage, total, pages: Math.ceil(total / perPage) },
+    pagination: {
+      page: pagination.page,
+      perPage: pagination.perPage,
+      total: pagination.total,
+      pages: pagination.pages,
+    },
   })
 })

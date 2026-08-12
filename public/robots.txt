@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /$
+Allow: /login
+Allow: /register
+
+# Everything behind authentication is per-customer data.
+Disallow: /dashboard
+Disallow: /accounts
+Disallow: /transactions
+Disallow: /transfer
+Disallow: /beneficiaries
+Disallow: /profile
+Disallow: /admin
+Disallow: /api/

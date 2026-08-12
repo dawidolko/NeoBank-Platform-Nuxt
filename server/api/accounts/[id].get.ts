@@ -13,9 +13,20 @@ export default defineEventHandler(async (event) => {
     include: {
       cards: true,
       entries: {
-        orderBy: { bookedAt: 'desc' },
+        orderBy: [{ bookedAt: 'desc' }, { id: 'desc' }],
         take: 10,
-        include: { transfer: true },
+        include: {
+          transfer: {
+            include: {
+              sourceAccount: {
+                select: { name: true, user: { select: { firstName: true, lastName: true } } },
+              },
+              destinationAccount: {
+                select: { name: true, user: { select: { firstName: true, lastName: true } } },
+              },
+            },
+          },
+        },
       },
     },
   })
