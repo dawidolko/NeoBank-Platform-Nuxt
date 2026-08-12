@@ -79,6 +79,24 @@ suite('ledger integrity', () => {
   })
 
   afterAll(async () => {
+    // Transfers outlive their accounts (the FK is SetNull, because a bank never
+    // erases booked history), so they must be removed explicitly. Leaving them
+    // behind strands COMPLETED transfers with zero entries and breaks
+    // `npm run db:verify` for everyone who runs the suite.
+    const accounts = await prisma.account.findMany({
+      where: { userId: { in: [userId, otherUserId] } },
+      select: { id: true },
+    })
+    const accountIds = accounts.map((account) => account.id)
+
+    await prisma.transfer.deleteMany({
+      where: {
+        OR: [
+          { sourceAccountId: { in: accountIds } },
+          { destinationAccountId: { in: accountIds } },
+        ],
+      },
+    })
     await prisma.user.deleteMany({ where: { id: { in: [userId, otherUserId] } } })
     await prisma.$disconnect()
   })
@@ -308,6 +326,16 @@ suite('ledger integrity', () => {
 
       expect(untouched.balanceCents).toBe(0n)
     } finally {
+      const strangerAccounts = stranger.accounts.map((account) => account.id)
+
+      await prisma.transfer.deleteMany({
+        where: {
+          OR: [
+            { sourceAccountId: { in: strangerAccounts } },
+            { destinationAccountId: { in: strangerAccounts } },
+          ],
+        },
+      })
       await prisma.user.delete({ where: { id: stranger.id } })
     }
   })
@@ -328,6 +356,9 @@ suite('ledger integrity', () => {
         }),
       ).rejects.toThrow(/does not convert currency/i)
     } finally {
+      await prisma.transfer.deleteMany({
+        where: { OR: [{ sourceAccountId: eur.id }, { destinationAccountId: eur.id }] },
+      })
       await prisma.account.delete({ where: { id: eur.id } })
     }
   })

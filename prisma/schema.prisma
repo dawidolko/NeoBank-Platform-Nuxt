@@ -57,6 +57,20 @@ enum TransferStatus {
   REVERSED
 }
 
+/// Spending categories, assigned automatically from the transfer title.
+enum Category {
+  GROCERIES
+  TRANSPORT
+  ENTERTAINMENT
+  SHOPPING
+  BILLS
+  HEALTH
+  TRAVEL
+  INCOME
+  TRANSFER
+  OTHER
+}
+
 enum EntryDirection {
   DEBIT
   CREDIT
@@ -85,10 +99,12 @@ model User {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  accounts     Account[]
-  sessions     Session[]
-  beneficiaries Beneficiary[]
-  auditLogs    AuditLog[]
+  accounts       Account[]
+  sessions       Session[]
+  beneficiaries  Beneficiary[]
+  auditLogs      AuditLog[]
+  standingOrders StandingOrder[]
+  notifications  Notification[]
 
   @@index([role])
   @@index([status])
@@ -122,15 +138,18 @@ model Account {
   balanceCents  BigInt        @default(0)
   /// How far the balance may go negative (overdraft), in minor units.
   overdraftCents BigInt       @default(0)
+  /// Warn the customer when the balance drops below this. Null disables it.
+  lowBalanceCents BigInt?
   userId        String
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
-  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  entries  Entry[]
-  cards    Card[]
-  outgoing Transfer[] @relation("SourceAccount")
-  incoming Transfer[] @relation("DestinationAccount")
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entries        Entry[]
+  cards          Card[]
+  outgoing       Transfer[]      @relation("SourceAccount")
+  incoming       Transfer[]      @relation("DestinationAccount")
+  standingOrders StandingOrder[]
 
   @@index([userId])
   @@index([status])
@@ -149,6 +168,7 @@ model Transfer {
   externalIban String?
   externalName String?
   failureReason String?
+  category     Category  @default(OTHER)
 
   sourceAccountId      String?
   destinationAccountId String?
@@ -187,6 +207,44 @@ model Entry {
   @@map("entries")
 }
 
+enum ScheduleInterval {
+  WEEKLY
+  MONTHLY
+}
+
+enum ScheduleStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+}
+
+/// A recurring transfer. The due date advances each time it fires, so a
+/// missed window is caught up rather than silently skipped.
+model StandingOrder {
+  id             String           @id @default(uuid())
+  userId         String
+  sourceAccountId String
+  destinationIban String
+  recipientName  String
+  title          String
+  amountCents    BigInt
+  interval       ScheduleInterval @default(MONTHLY)
+  status         ScheduleStatus   @default(ACTIVE)
+  nextRunAt      DateTime
+  lastRunAt      DateTime?
+  failureCount   Int              @default(0)
+  lastError      String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceAccount Account @relation(fields: [sourceAccountId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status, nextRunAt])
+  @@map("standing_orders")
+}
+
 model Beneficiary {
   id        String   @id @default(uuid())
   userId    String
@@ -218,6 +276,34 @@ model Card {
 
   @@index([accountId])
   @@map("cards")
+}
+
+enum NotificationKind {
+  TRANSFER_RECEIVED
+  TRANSFER_SENT
+  LOW_BALANCE
+  SECURITY
+  STANDING_ORDER
+}
+
+/// In-app alerts. Deliberately not emails — there is no mail transport in this
+/// demo, and a notification that silently fails to send is worse than none.
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  kind      NotificationKind
+  title     String
+  body      String
+  /// Where the notification points, e.g. /transactions/<id>.
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+  @@map("notifications")
 }
 
 model AuditLog {

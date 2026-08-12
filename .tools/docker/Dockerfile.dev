@@ -23,7 +23,7 @@ ENV NODE_ENV=development \
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
 
-RUN --mount=type=cache,target=/root/.npm \
+RUN --mount=type=cache,id=npm-dev,target=/root/.npm,sharing=locked \
     npm ci --ignore-scripts \
     && npx prisma generate
 

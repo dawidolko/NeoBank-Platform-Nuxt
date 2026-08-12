@@ -24,7 +24,7 @@ COPY package.json package-lock.json ./
 COPY prisma ./prisma
 
 # `npm ci` runs postinstall, which needs the schema present (copied above).
-RUN --mount=type=cache,target=/root/.npm \
+RUN --mount=type=cache,id=npm-build,target=/root/.npm,sharing=locked \
     npm ci --ignore-scripts \
     && npx prisma generate
 
@@ -63,7 +63,7 @@ RUN apt-get update -qq \
 COPY prisma ./prisma
 
 # Pinned to the versions resolved in package.json to keep builds reproducible.
-RUN --mount=type=cache,target=/root/.npm \
+RUN --mount=type=cache,id=npm-runtime,target=/root/.npm,sharing=locked \
     npm init -y > /dev/null \
     && npm install --no-audit --no-fund \
         prisma@^6.3.1 \
@@ -71,7 +71,6 @@ RUN --mount=type=cache,target=/root/.npm \
         tsx@^4.19.2 \
         argon2@^0.41.1 \
     && npx prisma generate \
-    && npm cache clean --force \
     # Strip only inert files. Do NOT prune packages here: `effect` looks like
     # test tooling but is a real runtime dependency of @prisma/config, and
     # removing it breaks `prisma migrate deploy` at container start.

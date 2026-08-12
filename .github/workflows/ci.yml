@@ -69,9 +69,10 @@ jobs:
           npm run db:seed
           npm run db:seed
 
-      - name: Verify the ledger reconciles after seeding
-        run: |
-          npx tsx scripts/verify-ledger.ts
+      # Runs last: the integration suite creates and removes its own accounts,
+      # so the ledger must still reconcile once that traffic has been through.
+      - name: Verify the ledger reconciles
+        run: npm run db:verify
 
       - name: Production build
         run: npm run build
