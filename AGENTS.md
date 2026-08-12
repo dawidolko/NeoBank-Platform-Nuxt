@@ -47,7 +47,10 @@ Rules:
    through `serializeBigInt(...)`, which converts money to strings. The client
    formats via `useFormat()`.
 3. **Never sum across currencies.** Group by currency first — see
-   `balancesByCurrency` in `server/api/dashboard.get.ts`.
+   `balancesByCurrency` *and* `flowByCurrency` in `server/api/dashboard.get.ts`.
+   A `groupBy(['direction'])` over entries spanning several currencies produces
+   an integer that is not money in any of them; group by account and map each
+   back to its currency.
 4. **Compare with the helper.** Use `hasSufficientFunds(balance, overdraft, debit)`
    rather than reimplementing the overdraft rule.
 
@@ -194,12 +197,24 @@ Non-negotiable, and cheap if you use the components above:
   headers, and a `tabindex="0"` scroll region.
 - Use `100dvh`, never `100vh` — mobile browser chrome overflows the latter.
 
+### Icons and charts
+
+`<AppIcon name="…">` renders an inline SVG from one map in the component — no
+emoji anywhere in the UI, since they render differently per platform. Add a path
+to `PATHS` rather than importing an icon package. `<SparkLine>` draws an area
+chart straight from minor-unit strings; there is no chart library.
+
 ### Styling
 
 Hand-written CSS in `app/assets/css/main.css` — no Tailwind, no UI framework.
 
-- **Use the tokens.** `var(--primary)`, `var(--text-muted)`, `var(--radius)` —
-  never raw hex. Both themes are defined; a hard-coded colour breaks dark mode.
+- **Use the tokens.** `var(--primary)`, `var(--space-4)`, `var(--text-sm)`,
+  `var(--radius)`, `var(--duration)` — never raw hex, px or ms. Spacing is a 4px
+  scale and type is a named scale; ad-hoc values like `13px` or `0.87rem` drift.
+- **Weights are 400/500/600/700 only** (`--weight-*`). Intermediate values like
+  650 silently round unless the variable font happens to load.
+- Both themes plus a manual `[data-theme]` override are defined; a hard-coded
+  colour breaks at least one of them.
 - **Use the existing classes** before writing new ones: `.card`, `.btn`,
   `.input`, `.badge`, `.table`, `.stack`, `.grid`, `.alert`, `.empty`.
 - **Component-specific styles go in `<style scoped>`.** Only genuinely shared
@@ -280,3 +295,6 @@ save space: `effect` looks like test tooling but is a real runtime dependency of
 - [ ] Inputs sit in `<FormField>`; icons are `aria-hidden`.
 - [ ] Colours and spacing come from tokens, not literals.
 - [ ] Copy is English.
+- [ ] Pagination goes through `paginate()`; list endpoints clamp out-of-range pages.
+- [ ] Any endpoint feeding `<TransactionRow>` includes `sourceAccount` and
+      `destinationAccount`, or the counterparty renders as a generic placeholder.

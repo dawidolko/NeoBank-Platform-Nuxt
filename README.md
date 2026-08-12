@@ -55,8 +55,19 @@ that are guaranteed to balance.
 - **Overdrafts** — credit accounts may go negative up to a configured limit;
   everything else is hard-blocked at zero.
 - **Per-transaction ceilings** on transfers and deposits.
-- **Statement export** — download any filtered view as CSV.
+- **Statement export** — download any filtered view as CSV, with spreadsheet
+  formula injection neutralised.
 - **Cards and saved recipients** for faster repeat transfers.
+
+### Insight
+
+- **Balance trend** — a 30-day area chart on the dashboard, drawn inline from the
+  ledger with no chart library.
+- **Money in / out / net**, computed **per currency** — a EUR movement never
+  contaminates a PLN total.
+- **Top payments** with proportional meters.
+- **Light, dark and system themes**, remembered across visits and applied before
+  first paint so there is no flash.
 
 ### Accounts & access
 
@@ -110,7 +121,8 @@ that are guaranteed to balance.
 | ORM        | **Prisma 6** — typed access and versioned migrations                   |
 | Auth       | Argon2id + hashed opaque session cookies                                |
 | Validation | **Zod** schemas shared by every endpoint                                |
-| Styling    | Hand-written CSS design system with light/dark support — no UI framework |
+| Styling    | Hand-written CSS design system, self-hosted Inter — no UI framework      |
+| Icons      | Inline SVG set, no icon-font or third-party request                     |
 | Testing    | **Vitest** — unit + integration against a real PostgreSQL               |
 | CI/CD      | GitHub Actions — lint, typecheck, test, reconcile, build, boot          |
 
@@ -164,8 +176,8 @@ another entry left behind. CI runs this after seeding.
 ```
 app/                      Nuxt application (client + SSR)
 ├── assets/css/           Design system: tokens, components, light/dark themes
-├── components/           Reusable UI — cards, modals, toasts, form fields
-├── composables/          useAuth, useFormat, useToast, useApiError, …
+├── components/           Reusable UI — cards, modals, toasts, icons, charts
+├── composables/          useAuth, useFormat, useToast, useTheme, useCounterparty, …
 ├── layouts/              default (app shell) and auth (split-screen)
 ├── middleware/           Global route guard: auth + admin
 └── pages/                File-based routes
@@ -181,6 +193,7 @@ prisma/
 ├── migrations/           Versioned SQL migrations
 └── seed.ts               Deterministic demo data
 
+public/                   favicon, robots.txt, web manifest
 scripts/verify-ledger.ts  Standalone ledger reconciliation
 tests/                    Vitest unit + integration suites
 .tools/docker/            Dockerfiles, compose stacks, entrypoint
@@ -271,7 +284,7 @@ npm run dev
 npm test
 ```
 
-78 tests covering the parts where a mistake costs money:
+102 tests covering the parts where a mistake costs money:
 
 - **Money handling** — parsing, formatting, round-trips, values beyond
   `Number.MAX_SAFE_INTEGER`, rejection of over-precise and negative amounts.
@@ -285,6 +298,12 @@ npm test
   retryable (Prisma reports a raw-query serialization failure as `P2010` with the
   real `40001` only in the message; matching on the code alone silently disables
   every retry).
+- **Counterparty resolution** — pinned against the exact shape each endpoint
+  returns, because the dashboard once omitted the account relations and labelled
+  every transfer between two customers "Transfer to your account".
+- **Pagination clamping** — a page past the end resolves to the last page rather
+  than stranding the visitor with no controls.
+- **BigInt serialization** — the response path of every endpoint that returns money.
 - **Ledger integrity** *(integration, real PostgreSQL)* — balanced entries,
   overdraft and ceiling limits, complete rollback on failure, cross-user access
   refusal, non-disclosure of internal accounts, and a concurrency test asserting
@@ -332,6 +351,11 @@ rather than serving a half-migrated application.
 
 ## Security notes
 
+- **Security headers** on every response: `frame-ancestors 'none'` plus
+  `X-Frame-Options: DENY`, a restrictive CSP, `nosniff`, `Referrer-Policy` and a
+  `Permissions-Policy` denying camera, microphone, geolocation and payment.
+- API responses are `Cache-Control: no-store`.
+
 - Passwords hashed with **Argon2id** (19 MiB memory cost, OWASP minimum).
 - Session tokens are 256-bit random values; **only their SHA-256 digest is stored**.
 - Cookies are `httpOnly`, `sameSite=lax`, and `secure` in production.
@@ -339,7 +363,8 @@ rather than serving a half-migrated application.
   and hashes a dummy password when the account does not exist so response time
   does not reveal whether an address is registered.
 - **Rate limits**: 5 sign-in attempts per minute per email, 20 per minute per IP,
-  3 registrations per 10 minutes, 20 transfers per minute per customer.
+  3 registrations per 10 minutes, 20 transfers and 10 deposits per minute per
+  customer, 5 password changes per 10 minutes, 5 statement exports per minute.
 - Failed transfers never disclose whether an IBAN belongs to NeoBank.
 - Every input is validated server-side with Zod, including path parameters and
   admin query strings; client checks are convenience only.
