@@ -3,6 +3,8 @@ import { Prisma, type Currency, type TransferType } from '@prisma/client'
 import { prisma } from '../utils/prisma'
 import { centsToDecimalString, hasSufficientFunds } from '../utils/money'
 import { isValidIban, normalizeIban } from '../utils/iban'
+import { categorize } from '../utils/categorize'
+import { checkLowBalance, notify } from './notifications'
 import { recordAudit } from './audit'
 
 export class TransferError extends Error {
@@ -200,6 +202,7 @@ export async function executeTransfer(input: TransferInput) {
             externalName: isInternal
               ? null
               : input.externalName?.trim() || 'External recipient',
+            category: categorize(title, type),
           },
         })
 
@@ -240,6 +243,25 @@ export async function executeTransfer(input: TransferInput) {
               amountCents,
               balanceAfterCents: destinationBalanceAfter,
             },
+          })
+        }
+
+        await checkLowBalance(tx, {
+          accountId: source.id,
+          userId,
+          accountName: source.name,
+          before: lockedSource.balanceCents,
+          after: sourceBalanceAfter,
+        })
+
+        // The recipient is told immediately; the sender gets a receipt.
+        if (destination && destination.userId !== userId) {
+          await notify(tx, {
+            userId: destination.userId,
+            kind: 'TRANSFER_RECEIVED',
+            title: 'Money received',
+            body: `${transfer.title} — ${centsToDecimalString(amountCents, source.currency as never)} ${source.currency}`,
+            link: `/accounts/${destination.id}`,
           })
         }
 

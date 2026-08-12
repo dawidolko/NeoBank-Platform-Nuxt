@@ -7,6 +7,7 @@
  */
 import { PrismaClient, type Account, type Currency, type Prisma } from '@prisma/client'
 import argon2 from 'argon2'
+import { categorize } from '../server/utils/categorize'
 
 const prisma = new PrismaClient()
 
@@ -139,6 +140,7 @@ async function bookTransfer(
       title: options.title,
       externalIban: options.externalIban ?? null,
       externalName: options.externalName ?? null,
+      category: categorize(options.title, options.type),
       sourceAccountId: isCredit ? (counterAccount?.id ?? null) : account.id,
       destinationAccountId: isCredit ? account.id : (counterAccount?.id ?? null),
       createdAt: bookedAt,
@@ -314,6 +316,71 @@ async function main() {
         iban: beneficiary.iban,
         bankName: beneficiary.bank,
       },
+    })
+  }
+
+  // --- Standing orders -----------------------------------------------------
+  // Upserted on a natural key (owner + reference) so a re-run does not duplicate.
+  const existingOrders = await prisma.standingOrder.count({ where: { userId: customer.id } })
+
+  if (existingOrders === 0) {
+    const firstOfNextMonth = new Date()
+    firstOfNextMonth.setMonth(firstOfNextMonth.getMonth() + 1)
+    firstOfNextMonth.setDate(1)
+    firstOfNextMonth.setHours(9, 0, 0, 0)
+
+    await prisma.standingOrder.createMany({
+      data: [
+        {
+          userId: customer.id,
+          sourceAccountId: mainAccount.id,
+          destinationIban: 'PL61109010140000071219812874',
+          recipientName: 'Property Management Ltd',
+          title: 'Monthly rent',
+          amountCents: 280_000n,
+          interval: 'MONTHLY',
+          nextRunAt: firstOfNextMonth,
+        },
+        {
+          userId: customer.id,
+          sourceAccountId: mainAccount.id,
+          destinationIban: savingsAccount.iban,
+          recipientName: 'Savings Goal',
+          title: 'Monthly savings',
+          amountCents: 100_000n,
+          interval: 'MONTHLY',
+          nextRunAt: firstOfNextMonth,
+        },
+      ],
+    })
+  }
+
+  // --- Low balance alert ---------------------------------------------------
+  await prisma.account.update({
+    where: { id: mainAccount.id },
+    data: { lowBalanceCents: 500_000n },
+  })
+
+  const notificationCount = await prisma.notification.count({ where: { userId: customer.id } })
+
+  if (notificationCount === 0) {
+    await prisma.notification.createMany({
+      data: [
+        {
+          userId: customer.id,
+          kind: 'SECURITY',
+          title: 'Welcome to NeoBank',
+          body: 'Your accounts are ready. Explore your statement or send your first transfer.',
+          link: '/dashboard',
+        },
+        {
+          userId: customer.id,
+          kind: 'STANDING_ORDER',
+          title: 'Standing orders active',
+          body: 'Monthly rent and savings are scheduled for the 1st of each month.',
+          link: '/standing-orders',
+        },
+      ],
     })
   }
 

@@ -131,6 +131,30 @@ export function requireUuidParam(value: string | undefined, label = 'Resource'):
   return value
 }
 
+export const standingOrderSchema = z.object({
+  sourceAccountId: z.string().uuid('Select an account to pay from'),
+  destinationIban: z
+    .string()
+    .trim()
+    .transform((value) => value.replace(/\s+/g, '').toUpperCase())
+    .refine(isValidIban, 'Recipient IBAN is not valid'),
+  recipientName: z.string().trim().min(2, 'Enter the recipient name').max(120),
+  title: z.string().trim().min(3, 'Add a reference').max(140),
+  amount: amountSchema,
+  interval: z.enum(['WEEKLY', 'MONTHLY']).default('MONTHLY'),
+  startsOn: z.string().date('Choose a start date'),
+})
+
+export const spendingQuerySchema = z.object({
+  currency: z.enum(['PLN', 'EUR', 'USD', 'GBP']).optional(),
+  days: z.coerce.number().int().min(7).max(365).default(90),
+})
+
+export const lowBalanceSchema = z.object({
+  /** Null clears the alert. */
+  amount: amountSchema.nullable(),
+})
+
 export const transactionQuerySchema = z.object({
   accountId: z.string().uuid().optional(),
   type: z.enum(['INTERNAL', 'EXTERNAL', 'DEPOSIT', 'WITHDRAWAL']).optional(),

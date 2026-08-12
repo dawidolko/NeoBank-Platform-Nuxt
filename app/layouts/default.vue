@@ -9,6 +9,8 @@ const navigation = computed(() => {
     { to: '/accounts', label: 'Accounts', icon: 'wallet' },
     { to: '/transfer', label: 'Send money', icon: 'send' },
     { to: '/transactions', label: 'Transactions', icon: 'receipt' },
+    { to: '/insights', label: 'Insights', icon: 'chart-pie' },
+    { to: '/standing-orders', label: 'Scheduled', icon: 'calendar-clock' },
     { to: '/beneficiaries', label: 'Recipients', icon: 'users' },
   ]
 
@@ -59,6 +61,7 @@ watch(() => route.fullPath, () => { menuOpen.value = false })
               <span class="tiny muted">{{ isAdmin ? 'Administrator' : 'Customer' }}</span>
             </span>
           </NuxtLink>
+          <NotificationBell />
           <ThemeToggle />
           <button
             class="btn btn-ghost btn-icon"
