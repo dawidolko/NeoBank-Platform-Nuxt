@@ -250,7 +250,7 @@ dates beside it. `npm run db:verify` catches exactly this.
 ## Testing
 
 ```bash
-npm test          # 78 tests
+npm test          # 102 tests
 npm run db:verify # reconcile the ledger from SQL
 ```
 
