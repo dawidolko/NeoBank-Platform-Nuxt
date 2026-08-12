@@ -24,6 +24,14 @@ export default defineNuxtConfig({
   nitro: {
     // Standalone bundle so the production image can run on a bare Node runtime.
     preset: 'node-server',
+    // Standing orders are paid by a scheduled task rather than on page load,
+    // so they fire whether or not anyone is using the app.
+    experimental: { tasks: true },
+    scheduledTasks: {
+      // Hourly: an order due at 09:00 is paid within the hour, and a missed
+      // window is caught up on the next tick rather than skipped.
+      '0 * * * *': ['standing-orders:run'],
+    },
     // Money is BigInt end to end; the default es2019 target cannot emit BigInt
     // literals and would break the ledger at runtime.
     esbuild: {

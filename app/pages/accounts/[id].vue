@@ -23,6 +23,33 @@ const renameErrors = useFormErrors()
 const closing = ref(false)
 const closePending = ref(false)
 
+const alertValue = ref('')
+const alertErrors = useFormErrors()
+
+watchEffect(() => {
+  const threshold = account.value?.lowBalanceCents
+
+  alertValue.value = threshold ? (Number(BigInt(threshold)) / 100).toFixed(2) : ''
+})
+
+async function saveAlert(clear = false) {
+  if (!account.value) return
+
+  const result = await alertErrors.submit(
+    () =>
+      $fetch<{ account: { lowBalanceCents: string | null } }>(
+        `/api/accounts/${account.value!.id}/alert`,
+        { method: 'PATCH', body: { amount: clear ? null : alertValue.value } },
+      ),
+    'Could not update the alert.',
+  )
+
+  if (!result) return
+
+  toast.success(clear ? 'Alert removed' : 'Alert saved')
+  await refresh()
+}
+
 const canClose = computed(
   () => account.value?.status === 'ACTIVE' && BigInt(account.value.balanceCents) === 0n,
 )
@@ -234,6 +261,47 @@ async function confirmClose() {
                   :disabled="depositErrors.submitting.value || !depositAmount"
                 >
                   {{ depositErrors.submitting.value ? 'Adding…' : 'Add' }}
+                </button>
+              </div>
+            </FormField>
+          </form>
+        </section>
+
+        <section v-if="account.status === 'ACTIVE'" class="card stack">
+          <h2 class="card-title">Low balance alert</h2>
+          <p class="tiny muted">
+            Get notified when this account drops below a threshold. Fires once per
+            crossing, not on every payment underneath it.
+          </p>
+
+          <form class="stack-sm" @submit.prevent="saveAlert(false)">
+            <FormField
+              v-slot="field"
+              label="Notify me below"
+              :error="alertErrors.errors.value.amount || alertErrors.errors.value.form"
+            >
+              <div class="row deposit-row">
+                <input
+                  :id="field.id"
+                  v-model="alertValue"
+                  class="input numeric"
+                  :class="{ 'has-error': field.invalid }"
+                  :aria-invalid="field.invalid"
+                  :aria-describedby="field.describedBy"
+                  inputmode="decimal"
+                  placeholder="5000.00"
+                >
+                <button class="btn" type="submit" :disabled="alertErrors.submitting.value || !alertValue">
+                  Save
+                </button>
+                <button
+                  v-if="account.lowBalanceCents"
+                  class="btn btn-ghost"
+                  type="button"
+                  :disabled="alertErrors.submitting.value"
+                  @click="saveAlert(true)"
+                >
+                  Clear
                 </button>
               </div>
             </FormField>
