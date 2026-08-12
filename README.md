@@ -57,15 +57,23 @@ that are guaranteed to balance.
 - **Per-transaction ceilings** on transfers and deposits.
 - **Statement export** — download any filtered view as CSV, with spreadsheet
   formula injection neutralised.
+- **Standing orders** — weekly or monthly payments that repeat on their own,
+  executed by a scheduled task with pause, resume and cancel.
 - **Cards and saved recipients** for faster repeat transfers.
 
 ### Insight
 
+- **Spending by category** — every transfer is categorised automatically from
+  its title, then charted as a donut with a per-month breakdown.
 - **Balance trend** — a 30-day area chart on the dashboard, drawn inline from the
   ledger with no chart library.
 - **Money in / out / net**, computed **per currency** — a EUR movement never
   contaminates a PLN total.
 - **Top payments** with proportional meters.
+- **In-app notifications** for money received, low balance and standing orders,
+  with an unread badge.
+- **Low balance alerts** per account, firing once on the crossing rather than on
+  every payment underneath the threshold.
 - **Light, dark and system themes**, remembered across visits and applied before
   first paint so there is no flash.
 
@@ -102,6 +110,8 @@ that are guaranteed to balance.
 | `/transfer`             | Send money, with own-account and saved-recipient shortcuts       |
 | `/transactions`         | Full statement: filter by account, type, date, text; CSV export  |
 | `/transactions/:id`     | Transaction receipt with both sides of the entry                 |
+| `/insights`             | Spending by category and by month, per currency                  |
+| `/standing-orders`      | Scheduled payments — create, pause, resume, cancel               |
 | `/beneficiaries`        | Saved recipients                                                 |
 | `/profile`              | Personal details, password change, signed-in devices             |
 | `/admin`                | Bank-wide overview *(admin only)*                                |
@@ -194,6 +204,7 @@ prisma/
 └── seed.ts               Deterministic demo data
 
 public/                   favicon, robots.txt, web manifest
+server/tasks/             Nitro scheduled tasks (standing orders)
 scripts/verify-ledger.ts  Standalone ledger reconciliation
 tests/                    Vitest unit + integration suites
 .tools/docker/            Dockerfiles, compose stacks, entrypoint
@@ -284,7 +295,7 @@ npm run dev
 npm test
 ```
 
-102 tests covering the parts where a mistake costs money:
+115 tests covering the parts where a mistake costs money:
 
 - **Money handling** — parsing, formatting, round-trips, values beyond
   `Number.MAX_SAFE_INTEGER`, rejection of over-precise and negative amounts.
@@ -304,6 +315,10 @@ npm test
 - **Pagination clamping** — a page past the end resolves to the last page rather
   than stranding the visitor with no controls.
 - **BigInt serialization** — the response path of every endpoint that returns money.
+- **Categorisation** — merchant rules, and the guarantee that an internal
+  transfer is never counted as spending.
+- **Schedule arithmetic** — a monthly order on the 31st lands on the last day of
+  a shorter month, and anchors to its due date so a late run never drifts.
 - **Ledger integrity** *(integration, real PostgreSQL)* — balanced entries,
   overdraft and ceiling limits, complete rollback on failure, cross-user access
   refusal, non-disclosure of internal accounts, and a concurrency test asserting

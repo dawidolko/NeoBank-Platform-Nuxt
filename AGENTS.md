@@ -81,6 +81,11 @@ Non-negotiable invariants — every one is covered by a test in
    confirm the IBAN belongs to NeoBank. Only the caller's own accounts get a
    descriptive message.
 
+Money that repeats goes through `server/services/standingOrders.ts`, which
+calls `executeTransfer` like any other payment — the locking and balancing
+rules are identical. `nextDueDate` anchors to the *previous due date*, not to
+`now`, so a late run never drifts the schedule later.
+
 Run `npm run db:verify` after touching the ledger or the seeder. It re-derives
 eight invariants straight from SQL, independently of the code that wrote the
 rows.
@@ -250,7 +255,7 @@ dates beside it. `npm run db:verify` catches exactly this.
 ## Testing
 
 ```bash
-npm test          # 102 tests
+npm test          # 115 tests
 npm run db:verify # reconcile the ledger from SQL
 ```
 
@@ -264,6 +269,19 @@ npm run db:verify # reconcile the ledger from SQL
 
 Any change to `server/services/transfers.ts` needs a test proving the invariant
 it touches still holds.
+
+## Notifications and categories
+
+`categorize(title, type)` assigns a spending category inside the write
+transaction — keyword rules, no network call, auditable. An INTERNAL transfer is
+always `TRANSFER`, never spending, or moving money to your own savings would
+show up as an expense.
+
+`notify(tx, …)` takes the transaction client for the same reason `recordAudit`
+does: a customer must never be told about a transfer that was rolled back.
+`checkLowBalance` fires only on the *crossing* — comparing the pre- and
+post-transaction balances — so a persistently low account is not a notification
+firehose.
 
 ## Docker
 
@@ -295,6 +313,8 @@ save space: `effect` looks like test tooling but is a real runtime dependency of
 - [ ] Inputs sit in `<FormField>`; icons are `aria-hidden`.
 - [ ] Colours and spacing come from tokens, not literals.
 - [ ] Copy is English.
+- [ ] Integration tests that create accounts also delete their transfers — the
+      FK is SetNull, so orphaned transfers break `db:verify` for everyone.
 - [ ] Pagination goes through `paginate()`; list endpoints clamp out-of-range pages.
 - [ ] Any endpoint feeding `<TransactionRow>` includes `sourceAccount` and
       `destinationAccount`, or the counterparty renders as a generic placeholder.

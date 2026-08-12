@@ -40,7 +40,7 @@ const features = [
 
 const metrics = [
   { value: '8', label: 'Ledger invariants verified from SQL' },
-  { value: '102', label: 'Automated tests' },
+  { value: '115', label: 'Automated tests' },
   { value: '0', label: 'Floating-point amounts' },
 ] as const
 
