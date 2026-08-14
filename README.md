@@ -21,7 +21,9 @@ One command brings up the database, applies migrations, seeds demo data and star
 
 ```bash
 git clone https://github.com/DawidOlko/NeoBank-Platform-Nuxt.git
+
 cd NeoBank-Platform-Nuxt
+
 docker compose -f .tools/docker/docker-compose.yml up --build
 ```
 
