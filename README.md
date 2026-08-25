@@ -57,6 +57,29 @@ The project demonstrates the engineering that banking correctness actually requi
 
 ---
 
+## 🖼️ Screenshots
+
+| Dashboard — balances & 30-day flow | Insights — where the money goes |
+|---|---|
+| [<img src="docs/screenshots/dashboard.webp" alt="Customer dashboard with total balance, money in and out, a 30-day sparkline and multi-currency account cards"/>](docs/screenshots/dashboard.webp) | [<img src="docs/screenshots/insights.webp" alt="Insights page with total spent, monthly average, spending split by category donut chart and a by-month breakdown"/>](docs/screenshots/insights.webp) |
+
+| Accounts | Transactions |
+|---|---|
+| [<img src="docs/screenshots/accounts.webp" alt="Accounts page listing everyday, savings and foreign currency accounts with IBANs and balances"/>](docs/screenshots/accounts.webp) | [<img src="docs/screenshots/transactions.webp" alt="Transaction history with counterparties, categories and running balances"/>](docs/screenshots/transactions.webp) |
+
+| Send money | Administration |
+|---|---|
+| [<img src="docs/screenshots/transfer.webp" alt="Transfer form with source account, recipient IBAN, amount and title fields"/>](docs/screenshots/transfer.webp) | [<img src="docs/screenshots/admin.webp" alt="Admin overview with customer, account and transfer counters, deposits held, transfers by status and latest transfers"/>](docs/screenshots/admin.webp) |
+
+| Audit log | Sign in |
+|---|---|
+| [<img src="docs/screenshots/admin-audit.webp" alt="Administrator audit log listing recorded actions"/>](docs/screenshots/admin-audit.webp) | [<img src="docs/screenshots/login.webp" alt="Sign in page with email and password fields"/>](docs/screenshots/login.webp) |
+
+> Captured from the running Docker dev stack with the deterministic seed data.
+> At capture time `npm run db:verify` reconciled the ledger across **7 accounts, 142 transfers and 156 entries** — all eight invariants passing.
+
+---
+
 ## 🏗️ Architecture
 
 ### Application Layer
