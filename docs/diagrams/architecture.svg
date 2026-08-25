@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="470" viewBox="0 0 900 470" role="img" aria-label="NeoBank — Application Architecture">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" fill="#8b949e"/></marker></defs>
+<rect width="900" height="470" rx="12" fill="#0d1117"/>
+<text x="24" y="34" fill="#e6edf3" font-size="16" font-weight="700" font-family="system-ui,-apple-system,Segoe UI,sans-serif">NeoBank — Application Architecture</text>
+
+<rect x="40" y="78" width="820" height="62" rx="10" fill="none" stroke="#3fb950" stroke-width="1.2" stroke-dasharray="5 4" opacity="0.75"/>
+  <text x="52" y="71" fill="#3fb950" font-size="12" font-weight="700" letter-spacing="0.6" font-family="system-ui,-apple-system,Segoe UI,sans-serif">NUXT 4 — CLIENT (Vue 3, TypeScript)</text>
+<rect x="60" y="90" width="240" height="40" rx="8" fill="#161b22" stroke="#3fb950" stroke-width="1.6"/><text x="180" y="104" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="600" font-family="system-ui,-apple-system,Segoe UI,sans-serif">Pages &amp; layouts</text>
+       <text x="180" y="123" text-anchor="middle" fill="#8b949e" font-size="11.5" font-family="system-ui,-apple-system,Segoe UI,sans-serif">dashboard · transfers · cards</text>
+<rect x="330" y="90" width="240" height="40" rx="8" fill="#161b22" stroke="#3fb950" stroke-width="1.6"/><text x="450" y="104" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="600" font-family="system-ui,-apple-system,Segoe UI,sans-serif">Composables &amp; stores</text>
+       <text x="450" y="123" text-anchor="middle" fill="#8b949e" font-size="11.5" font-family="system-ui,-apple-system,Segoe UI,sans-serif">reactive state</text>
+<rect x="600" y="90" width="240" height="40" rx="8" fill="#161b22" stroke="#3fb950" stroke-width="1.6"/><text x="720" y="104" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="600" font-family="system-ui,-apple-system,Segoe UI,sans-serif">UI components</text>
+       <text x="720" y="123" text-anchor="middle" fill="#8b949e" font-size="11.5" font-family="system-ui,-apple-system,Segoe UI,sans-serif">accessible design system</text>
+<line x1="450" y1="140" x2="450" y2="178" stroke="#8b949e" stroke-width="1.5" marker-end="url(#a)"/><rect x="412" y="150" width="76" height="17" rx="4" fill="#0d1117"/>
+       <text x="450" y="162.5" text-anchor="middle" fill="#8b949e" font-size="11" font-family="system-ui,-apple-system,Segoe UI,sans-serif">SSR + /api</text>
+<rect x="40" y="170" width="820" height="112" rx="10" fill="none" stroke="#388bfd" stroke-width="1.2" stroke-dasharray="5 4" opacity="0.75"/>
+  <text x="52" y="163" fill="#388bfd" font-size="12" font-weight="700" letter-spacing="0.6" font-family="system-ui,-apple-system,Segoe UI,sans-serif">NUXT 4 — SERVER (Nitro)</text>
+<rect x="60" y="184" width="180" height="40" rx="8" fill="#161b22" stroke="#388bfd" stroke-width="1.6"/><text x="150" y="198" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="600" font-family="system-ui,-apple-system,Segoe UI,sans-serif">API routes</text>
+       <text x="150" y="217" text-anchor="middle" fill="#8b949e" font-size="11.5" font-family="system-ui,-apple-system,Segoe UI,sans-serif">server/api/**</text>
+<rect x="255" y="184" width="180" height="40" rx="8" fill="#161b22" stroke="#388bfd" stroke-width="1.6"/><text x="345" y="198" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="600" font-family="system-ui,-apple-system,Segoe UI,sans-serif">Services</text>
+       <text x="345" y="217" text-anchor="middle" fill="#8b949e" font-size="11.5" font-family="system-ui,-apple-system,Segoe UI,sans-serif">domain logic</text>
+<rect x="450" y="184" width="180" height="40" rx="8" fill="#161b22" stroke="#388bfd" stroke-width="1.6"/><text x="540" y="198" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="600" font-family="system-ui,-apple-system,Segoe UI,sans-serif">Validation</text>
+       <text x="540" y="217" text-anchor="middle" fill="#8b949e" font-size="11.5" font-family="system-ui,-apple-system,Segoe UI,sans-serif">typed schemas</text>
+<rect x="645" y="184" width="195" height="40" rx="8" fill="#161b22" stroke="#f85149" stroke-width="1.6"/><text x="742.5" y="198" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="600" font-family="system-ui,-apple-system,Segoe UI,sans-serif">Auth &amp; sessions</text>
+       <text x="742.5" y="217" text-anchor="middle" fill="#8b949e" font-size="11.5" font-family="system-ui,-apple-system,Segoe UI,sans-serif">password hashing</text>
+<rect x="60" y="232" width="375" height="38" rx="8" fill="#161b22" stroke="#d29922" stroke-width="1.6"/><text x="247.5" y="245" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="600" font-family="system-ui,-apple-system,Segoe UI,sans-serif">Double-entry ledger</text>
+       <text x="247.5" y="264" text-anchor="middle" fill="#8b949e" font-size="11.5" font-family="system-ui,-apple-system,Segoe UI,sans-serif">balanced debit / credit postings</text>
+<rect x="450" y="232" width="390" height="38" rx="8" fill="#161b22" stroke="#a371f7" stroke-width="1.6"/><text x="645" y="245" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="600" font-family="system-ui,-apple-system,Segoe UI,sans-serif">Prisma ORM</text>
+       <text x="645" y="264" text-anchor="middle" fill="#8b949e" font-size="11.5" font-family="system-ui,-apple-system,Segoe UI,sans-serif">type-safe queries · migrations · seed</text>
+<line x1="450" y1="282" x2="450" y2="320" stroke="#8b949e" stroke-width="1.5" marker-end="url(#a)"/><rect x="435.1" y="292" width="29.799999999999997" height="17" rx="4" fill="#0d1117"/>
+       <text x="450" y="304.5" text-anchor="middle" fill="#8b949e" font-size="11" font-family="system-ui,-apple-system,Segoe UI,sans-serif">SQL</text>
+<rect x="330" y="320" width="240" height="44" rx="8" fill="#161b22" stroke="#a371f7" stroke-width="1.6"/><text x="450" y="336" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="600" font-family="system-ui,-apple-system,Segoe UI,sans-serif">PostgreSQL</text>
+       <text x="450" y="355" text-anchor="middle" fill="#8b949e" font-size="11.5" font-family="system-ui,-apple-system,Segoe UI,sans-serif">accounts · ledger · transactions</text>
+<rect x="60" y="388" width="780" height="40" rx="8" fill="#161b22" stroke="#8b949e" stroke-width="1.6"/><text x="450" y="413" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="600" font-family="system-ui,-apple-system,Segoe UI,sans-serif">Vitest test suite · ESLint · TypeScript strict · ledger verification script</text>
+</svg>

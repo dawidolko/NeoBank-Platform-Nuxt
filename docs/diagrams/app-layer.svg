@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="400" viewBox="0 0 900 400" role="img" aria-label="NeoBank — Application Layers">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" fill="#8b949e"/></marker></defs>
+<rect width="900" height="400" rx="12" fill="#0d1117"/>
+<text x="24" y="34" fill="#e6edf3" font-size="16" font-weight="700" font-family="system-ui,-apple-system,Segoe UI,sans-serif">NeoBank — Application Layers</text>
+
+<rect x="40" y="78" width="820" height="70" rx="10" fill="none" stroke="#3fb950" stroke-width="1.2" stroke-dasharray="5 4" opacity="0.75"/>
+  <text x="52" y="71" fill="#3fb950" font-size="12" font-weight="700" letter-spacing="0.6" font-family="system-ui,-apple-system,Segoe UI,sans-serif">BANKING FEATURES</text>
+<rect x="60" y="92" width="250" height="42" rx="8" fill="#161b22" stroke="#3fb950" stroke-width="1.6"/><text x="185" y="107" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="600" font-family="system-ui,-apple-system,Segoe UI,sans-serif">Accounts</text>
+       <text x="185" y="126" text-anchor="middle" fill="#8b949e" font-size="11.5" font-family="system-ui,-apple-system,Segoe UI,sans-serif">balances · statements</text>
+<rect x="335" y="92" width="250" height="42" rx="8" fill="#161b22" stroke="#3fb950" stroke-width="1.6"/><text x="460" y="107" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="600" font-family="system-ui,-apple-system,Segoe UI,sans-serif">Transfers</text>
+       <text x="460" y="126" text-anchor="middle" fill="#8b949e" font-size="11.5" font-family="system-ui,-apple-system,Segoe UI,sans-serif">internal &amp; external payments</text>
+<rect x="610" y="92" width="230" height="42" rx="8" fill="#161b22" stroke="#3fb950" stroke-width="1.6"/><text x="725" y="107" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="600" font-family="system-ui,-apple-system,Segoe UI,sans-serif">Cards</text>
+       <text x="725" y="126" text-anchor="middle" fill="#8b949e" font-size="11.5" font-family="system-ui,-apple-system,Segoe UI,sans-serif">issuing · limits · freeze</text>
+<rect x="40" y="178" width="820" height="70" rx="10" fill="none" stroke="#d29922" stroke-width="1.2" stroke-dasharray="5 4" opacity="0.75"/>
+  <text x="52" y="171" fill="#d29922" font-size="12" font-weight="700" letter-spacing="0.6" font-family="system-ui,-apple-system,Segoe UI,sans-serif">FINANCIAL CORE</text>
+<rect x="60" y="192" width="250" height="42" rx="8" fill="#161b22" stroke="#d29922" stroke-width="1.6"/><text x="185" y="207" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="600" font-family="system-ui,-apple-system,Segoe UI,sans-serif">Double-entry ledger</text>
+       <text x="185" y="226" text-anchor="middle" fill="#8b949e" font-size="11.5" font-family="system-ui,-apple-system,Segoe UI,sans-serif">every movement balances</text>
+<rect x="335" y="192" width="250" height="42" rx="8" fill="#161b22" stroke="#d29922" stroke-width="1.6"/><text x="460" y="207" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="600" font-family="system-ui,-apple-system,Segoe UI,sans-serif">Transaction integrity</text>
+       <text x="460" y="226" text-anchor="middle" fill="#8b949e" font-size="11.5" font-family="system-ui,-apple-system,Segoe UI,sans-serif">atomic DB transactions</text>
+<rect x="610" y="192" width="230" height="42" rx="8" fill="#161b22" stroke="#d29922" stroke-width="1.6"/><text x="725" y="207" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="600" font-family="system-ui,-apple-system,Segoe UI,sans-serif">Verification</text>
+       <text x="725" y="226" text-anchor="middle" fill="#8b949e" font-size="11.5" font-family="system-ui,-apple-system,Segoe UI,sans-serif">db:verify ledger audit</text>
+<rect x="40" y="278" width="820" height="70" rx="10" fill="none" stroke="#a371f7" stroke-width="1.2" stroke-dasharray="5 4" opacity="0.75"/>
+  <text x="52" y="271" fill="#a371f7" font-size="12" font-weight="700" letter-spacing="0.6" font-family="system-ui,-apple-system,Segoe UI,sans-serif">FOUNDATION</text>
+<rect x="60" y="292" width="250" height="42" rx="8" fill="#161b22" stroke="#a371f7" stroke-width="1.6"/><text x="185" y="307" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="600" font-family="system-ui,-apple-system,Segoe UI,sans-serif">Nuxt 4 + Nitro</text>
+       <text x="185" y="326" text-anchor="middle" fill="#8b949e" font-size="11.5" font-family="system-ui,-apple-system,Segoe UI,sans-serif">SSR &amp; server routes</text>
+<rect x="335" y="292" width="250" height="42" rx="8" fill="#161b22" stroke="#a371f7" stroke-width="1.6"/><text x="460" y="307" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="600" font-family="system-ui,-apple-system,Segoe UI,sans-serif">Prisma + PostgreSQL</text>
+       <text x="460" y="326" text-anchor="middle" fill="#8b949e" font-size="11.5" font-family="system-ui,-apple-system,Segoe UI,sans-serif">typed data access</text>
+<rect x="610" y="292" width="230" height="42" rx="8" fill="#161b22" stroke="#a371f7" stroke-width="1.6"/><text x="725" y="307" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="600" font-family="system-ui,-apple-system,Segoe UI,sans-serif">Vitest</text>
+       <text x="725" y="326" text-anchor="middle" fill="#8b949e" font-size="11.5" font-family="system-ui,-apple-system,Segoe UI,sans-serif">automated test suite</text>
+</svg>
