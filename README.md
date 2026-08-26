@@ -7,12 +7,12 @@
 The project demonstrates the engineering that banking correctness actually requires: `BigInt` minor units end to end, `SERIALIZABLE` transactions with deterministic lock ordering, retry-on-serialization-failure, Argon2id password hashing with hashed session tokens, and a standalone reconciliation script that re-derives eight ledger invariants straight from SQL. Fully containerized with Docker and covered by a Vitest suite that runs against a real PostgreSQL.
 
 [![CI](https://github.com/dawidolko/NeoBank-Platform-Nuxt/actions/workflows/ci.yml/badge.svg)](https://github.com/dawidolko/NeoBank-Platform-Nuxt/actions/workflows/ci.yml)
-[![Nuxt](https://img.shields.io/badge/Nuxt-4.x-00DC82?logo=nuxt&logoColor=white)](https://nuxt.com)
-[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Prisma](https://img.shields.io/badge/Prisma-6.x-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org)
-[![Vitest](https://img.shields.io/badge/Vitest-3.x-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+![Nuxt](https://img.shields.io/badge/Nuxt-4.x-00DC82?logo=nuxtdotjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
+![Prisma](https://img.shields.io/badge/Prisma-6.x-2D3748?logo=prisma&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-3.x-6E9F18?logo=vitest&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green)
 
 ---
 
