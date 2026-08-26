@@ -101,6 +101,14 @@ COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=build /app/.output ./.output
 COPY package.json ./
 COPY prisma ./prisma
+
+# The seeder is executed by the entrypoint through tsx, straight from source,
+# and it imports `categorize` from the server utilities. The Nitro bundle in
+# .output is compiled and cannot be imported by path, so that one module has to
+# ship as source too — otherwise SEED_ON_BOOT=true dies with ERR_MODULE_NOT_FOUND
+# and the container never becomes healthy.
+COPY server/utils/categorize.ts ./server/utils/categorize.ts
+
 COPY .tools/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 
 RUN chmod +x /usr/local/bin/entrypoint.sh \
