@@ -1,0 +1,91 @@
+name: Deploy NeoBank
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-neobank
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Build and verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Build
+        run: npm run build
+
+      - name: Validate compose file
+        run: docker compose -f .tools/docker/docker-compose.prod.yml config > /dev/null
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          NUXT_SESSION_SECRET: ci-secret-not-used-at-runtime
+
+  deploy:
+    name: Deploy to production
+    runs-on: ubuntu-latest
+    needs: verify
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          command_timeout: 25m
+          script: |
+            set -e
+            cd /var/www/neobank
+
+            echo "==> Pobieranie zmian..."
+            git fetch origin main
+            git reset --hard origin/main
+
+            if [ ! -f .tools/docker/.env ]; then
+              echo "BLAD: brak .tools/docker/.env — skopiuj .env.example i uzupelnij."
+              exit 1
+            fi
+
+            echo "==> Przebudowa kontenerow..."
+            docker compose -f .tools/docker/docker-compose.prod.yml --env-file .tools/docker/.env up -d --build
+
+            echo "==> Oczekiwanie na aplikacje..."
+            for i in $(seq 1 40); do
+              code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8120/ || echo "000")
+              case "$code" in 200|301|302) break;; esac
+              sleep 10
+            done
+
+            echo "==> Status:"
+            docker compose -f .tools/docker/docker-compose.prod.yml --env-file .tools/docker/.env ps
+
+            echo "==> Weryfikacja odpowiedzi..."
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8120/ || echo "000")
+            echo "HTTP: $code"
+            case "$code" in
+              200|301|302) echo "==> Deploy zakonczony." ;;
+              *)
+                echo "Aplikacja nie odpowiada poprawnie."
+                docker compose -f .tools/docker/docker-compose.prod.yml --env-file .tools/docker/.env logs --tail=60
+                exit 1
+                ;;
+            esac
