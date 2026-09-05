@@ -198,9 +198,15 @@ async function main() {
   ])
 
   // --- Users ---------------------------------------------------------------
+  /*
+   * Haslo demo jest odswiezane rowniez przy aktualizacji, nie tylko przy
+   * tworzeniu konta. Bez tego zmiana SEED_*_PASSWORD nie mialaby zadnego
+   * skutku dla konta, ktore juz istnieje — a to wlasnie konta demo maja
+   * odpowiadac danym podpowiadanym na ekranie logowania.
+   */
   const admin = await prisma.user.upsert({
     where: { email: adminEmail },
-    update: { role: 'ADMIN', status: 'ACTIVE' },
+    update: { role: 'ADMIN', status: 'ACTIVE', passwordHash: adminHash },
     create: {
       email: adminEmail,
       passwordHash: adminHash,
@@ -213,7 +219,7 @@ async function main() {
 
   const customer = await prisma.user.upsert({
     where: { email: customerEmail },
-    update: { status: 'ACTIVE' },
+    update: { status: 'ACTIVE', passwordHash: customerHash },
     create: {
       email: customerEmail,
       passwordHash: customerHash,
