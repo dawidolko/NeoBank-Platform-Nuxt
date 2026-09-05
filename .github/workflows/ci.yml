@@ -101,6 +101,10 @@ jobs:
 
       - name: Boot the stack and wait for health
         env:
+          # Na produkcji aplikacja wychodzi na 8120 (za nginx), ale ten krok
+          # odpytuje localhost:3000. Bez jawnego APP_PORT compose bralby
+          # wartosc domyslna i nikt nie sluchalby na porcie, ktory sprawdzamy.
+          APP_PORT: '3000'
           POSTGRES_USER: neobank
           POSTGRES_PASSWORD: neobank-ci
           POSTGRES_DB: neobank_production
