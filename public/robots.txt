@@ -12,3 +12,5 @@ Disallow: /beneficiaries
 Disallow: /profile
 Disallow: /admin
 Disallow: /api/
+
+Sitemap: https://neobank.dawidolko.pl/sitemap.xml
