@@ -177,7 +177,7 @@ The run prints a per-check line with the violation count and finishes with a sum
 - **Nuxt 4** (Vue 3, SSR, file-based routing) — application shell and pages
 - **TypeScript**, strict mode across app, server and scripts
 - **Hand-written CSS design system** — tokens, components and light/dark themes; no UI framework
-- **@nuxt/fonts** — self-hosted Inter
+- **Self-hosted fonts** — Inter and JetBrains Mono as woff2 files in `public/fonts`
 - **Inline SVG icon set** — no icon font, no third-party request
 - **Inline charts** — `DonutChart` and `SparkLine` drawn from the ledger with no chart library
 

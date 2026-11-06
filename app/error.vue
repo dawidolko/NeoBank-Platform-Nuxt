@@ -16,19 +16,21 @@ const description = computed(() => {
 
   return props.error.statusMessage || 'An unexpected error occurred. Please try again.'
 })
+
+useSeoMeta({ title: () => `${title.value} — NeoBank`, robots: 'noindex' })
 </script>
 
 <template>
-  <div class="error-shell">
+  <main class="error-shell">
     <div class="error-card card">
       <p class="error-code">{{ error.statusCode }}</p>
       <h1>{{ title }}</h1>
       <p class="muted">{{ description }}</p>
-      <button class="btn" type="button" @click="clearError({ redirect: '/dashboard' })">
-        Back to dashboard
+      <button class="btn" type="button" @click="clearError({ redirect: '/' })">
+        Back to the home page
       </button>
     </div>
-  </div>
+  </main>
 </template>
 
 <style scoped>

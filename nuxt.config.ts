@@ -3,19 +3,9 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-01-01',
   devtools: { enabled: true },
 
-  modules: ['@nuxt/eslint', '@nuxt/fonts'],
+  modules: ['@nuxt/eslint'],
 
   css: ['~/assets/css/main.css'],
-
-  // Self-hosted so the app has a typographic identity offline and in Docker,
-  // with no third-party request on first paint.
-  fonts: {
-    families: [
-      { name: 'Inter', provider: 'google', weights: [400, 500, 600, 700], styles: ['normal'] },
-      { name: 'JetBrains Mono', provider: 'google', weights: [400, 500], styles: ['normal'] },
-    ],
-    defaults: { subsets: ['latin', 'latin-ext'] },
-  },
 
   future: {
     compatibilityVersion: 4,
@@ -24,6 +14,7 @@ export default defineNuxtConfig({
   nitro: {
     // Standalone bundle so the production image can run on a bare Node runtime.
     preset: 'node-server',
+    compressPublicAssets: { gzip: true, brotli: true },
     // Standing orders are paid by a scheduled task rather than on page load,
     // so they fire whether or not anyone is using the app.
     experimental: { tasks: true },
@@ -93,10 +84,18 @@ export default defineNuxtConfig({
         { charset: 'utf-8' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
         { name: 'theme-color', content: '#3b5bfd' },
+        { name: 'referrer', content: 'strict-origin-when-cross-origin' },
       ],
       link: [
         { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
         { rel: 'manifest', href: '/site.webmanifest' },
+        {
+          rel: 'preload',
+          href: '/fonts/inter-latin.woff2',
+          as: 'font',
+          type: 'font/woff2',
+          crossorigin: 'anonymous',
+        },
       ],
       script: [
         {

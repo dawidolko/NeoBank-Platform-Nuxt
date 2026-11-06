@@ -1,0 +1,13 @@
+# NeoBank
+
+> NeoBank is a fullstack demo banking platform by Dawid Olko, built with Nuxt 4, TypeScript, Prisma and PostgreSQL. Customers hold multi-currency accounts and move money through a double-entry ledger. It is not a real bank.
+
+## Pages
+
+- [Home](https://neobank.dawidolko.pl/): what the platform does and how it is built
+- [Sign in](https://neobank.dawidolko.pl/login): access to an existing account
+- [Open an account](https://neobank.dawidolko.pl/register): registration for a demo account
+
+## Author
+
+- [Dawid Olko](https://dawidolko.pl): Fullstack / AI Developer who built this site

@@ -1,15 +1,11 @@
 <script setup lang="ts">
 definePageMeta({ layout: false })
 
-useSeoMeta({
+usePublicSeo({
+  path: '/',
   title: 'NeoBank — Digital Banking Platform',
   description:
     'A fullstack digital bank: multi-currency accounts, a double-entry ledger, instant transfers, searchable statements and an administration panel.',
-  ogTitle: 'NeoBank — Digital Banking Platform',
-  ogDescription:
-    'Multi-currency accounts, a double-entry ledger and instant transfers. Built with Nuxt 4, TypeScript, Prisma and PostgreSQL.',
-  ogType: 'website',
-  twitterCard: 'summary_large_image',
 })
 
 const { isAuthenticated } = useAuth()
@@ -61,6 +57,7 @@ const preview = {
 
 <template>
   <div class="landing">
+    <a href="#main" class="skip-link">Skip to content</a>
     <header class="landing-header">
       <div class="container row-between">
         <span class="brand">
@@ -81,6 +78,7 @@ const preview = {
       </div>
     </header>
 
+    <main id="main">
     <section class="hero">
       <div class="container hero-grid">
         <div class="hero-copy">
@@ -218,6 +216,8 @@ const preview = {
         </ul>
       </div>
     </section>
+
+    </main>
 
     <footer class="landing-footer">
       <div class="container row-between">

@@ -13,6 +13,12 @@ export default defineNuxtRouteMiddleware(async (to) => {
     await refresh()
   }
 
+  /*
+   * An address that matches no page is left to the router, which answers 404.
+   * Sending it to the sign-in page would tell crawlers it exists.
+   */
+  if (to.matched.length === 0) return
+
   const isPublic = PUBLIC_ROUTES.has(to.path)
 
   if (!user.value && !isPublic) {

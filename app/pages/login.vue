@@ -1,7 +1,12 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'auth' })
 
-useHead({ title: 'Sign in — NeoBank' })
+usePublicSeo({
+  path: '/login',
+  title: 'Sign in to your account — NeoBank',
+  description:
+    'Sign in to NeoBank to see your multi-currency accounts, send instant transfers and search the history of every transaction.',
+})
 
 const { login } = useAuth()
 const route = useRoute()

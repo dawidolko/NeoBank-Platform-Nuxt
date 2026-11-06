@@ -1,7 +1,12 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'auth' })
 
-useHead({ title: 'Open an account — NeoBank' })
+usePublicSeo({
+  path: '/register',
+  title: 'Open a multi-currency account — NeoBank',
+  description:
+    'Open a NeoBank account with PLN, EUR, USD and GBP balances, instant transfers between customers and a complete, searchable history.',
+})
 
 const { register } = useAuth()
 
