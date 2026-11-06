@@ -105,6 +105,7 @@ export default defineNuxtConfig({
           innerHTML: `(()=>{try{var t=localStorage.getItem('neobank-theme');if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t)}catch(e){}})()`,
           tagPosition: 'head',
         },
+        { src: '/a11y/a11y-panel.js', defer: true, 'data-accent': '#3b5bfd' },
       ],
     },
     pageTransition: { name: 'page', mode: 'out-in' },
