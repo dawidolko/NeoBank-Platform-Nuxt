@@ -1,3 +1,7 @@
+<p align="center">
+  <a href="https://neobank.dawidolko.pl"><img src="docs/readme/banner.webp" alt="NeoBank Platform: fullstack platform. Fullstack Retail Banking Platform - Accounts, transfers and an admin panel on a real double-entry ledger" width="100%"></a>
+</p>
+
 # NeoBank Platform
 
 > 🚀 **Fullstack Retail Banking Platform** - Accounts, transfers and an admin panel on a real double-entry ledger
@@ -13,6 +17,8 @@ The project demonstrates the engineering that banking correctness actually requi
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)
 ![Vitest](https://img.shields.io/badge/Vitest-3.x-6E9F18?logo=vitest&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
+
+**[Live site](https://neobank.dawidolko.pl)** · [Screenshots](#️-screenshots) · [Getting started](#-getting-started)
 
 ---
 
@@ -357,6 +363,8 @@ On start, the entrypoint waits for the database, applies migrations, optionally 
 - Icons are `aria-hidden` with text equivalents; a skip link jumps to content
 - Animation is disabled under `prefers-reduced-motion`
 
+An accessibility panel in the corner of every page changes text size, contrast, font and motion, and remembers the choice on the device. It sits on top of the markup and does not replace accessible markup.
+
 ---
 
 ## 📁 Project Structure
@@ -411,7 +419,6 @@ NeoBank-Platform-Nuxt/
 
 ## 👨‍💻 Author
 
-Created by **[Dawid Olko](https://github.com/dawidolko)**
+**Dawid Olko** · Fullstack / AI Developer
 
-- **Website** — [dawidolko.pl](https://dawidolko.pl/)
-- **LinkedIn** — [@dawidolko](https://www.linkedin.com/in/dawidolko/)
+[Portfolio](https://olkodawid.dawidolko.pl) · [CV](https://cv.dawidolko.pl) · [LinkedIn](https://www.linkedin.com/in/dawidolko/) · [GitHub](https://github.com/dawidolko)
