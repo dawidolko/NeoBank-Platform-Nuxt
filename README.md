@@ -413,7 +413,7 @@ NeoBank-Platform-Nuxt/
 
 ## 📄 License
 
-[MIT](LICENSE) © Dawid Olko
+[MIT](LICENSE) © Dawid Olko Fonts and other third-party material keep their own licences, listed in [CREDITS.md](CREDITS.md).
 
 ---
 
