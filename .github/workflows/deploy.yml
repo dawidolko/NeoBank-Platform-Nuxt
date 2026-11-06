@@ -43,7 +43,7 @@ jobs:
           NUXT_SESSION_SECRET: ci-secret-not-used-at-runtime
 
   sekrety:
-    name: Konfiguracja wdrozenia
+    name: Deployment configuration
     runs-on: ubuntu-latest
     outputs:
       gotowe: ${{ steps.test.outputs.gotowe }}
@@ -54,10 +54,9 @@ jobs:
           UZYTKOWNIK: ${{ secrets.SERVER_USER }}
           KLUCZ: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
-          # Brak sekretow to nie blad budowania, tylko informacja, ze nie ma
-          # dokad wdrazac. Przebieg konczy sie wtedy na zielono, a zadanie
-          # `deploy` jest pomijane — dzieki temu czerwony status oznacza
-          # rzeczywisty problem z kodem, a nie nieskonfigurowane repozytorium.
+          # Missing secrets are not a build error, they just mean there is nowhere to
+          # deploy. The run then finishes green and the `deploy` job is skipped, so a red
+          # status means a real code problem rather than an unconfigured repository.
           brak=""
           [ -z "$IP" ]         && brak="$brak SERVER_IP"
           [ -z "$UZYTKOWNIK" ] && brak="$brak SERVER_USER"
@@ -65,11 +64,11 @@ jobs:
 
           if [ -n "$brak" ]; then
             echo "gotowe=nie" >> "$GITHUB_OUTPUT"
-            echo "::notice title=Wdrozenie pominiete::Brak sekretow:$brak — dodaj je w Settings > Secrets and variables > Actions."
-            echo "Wdrozenie pominiete. Brakuje sekretow:$brak"
+            echo "::notice title=Deployment skipped::Missing secrets:$brak - add them in Settings > Secrets and variables > Actions."
+            echo "Deployment skipped. Missing secrets:$brak"
           else
             echo "gotowe=tak" >> "$GITHUB_OUTPUT"
-            echo "Sekrety obecne — wdrazam."
+            echo "Secrets present, deploying."
           fi
 
   deploy:
@@ -90,19 +89,19 @@ jobs:
             set -e
             cd /var/www/neobank
 
-            echo "==> Pobieranie zmian..."
+            echo "==> Fetching changes..."
             git fetch origin main
             git reset --hard origin/main
 
             if [ ! -f .tools/docker/.env ]; then
-              echo "BLAD: brak .tools/docker/.env — skopiuj .env.example i uzupelnij."
+              echo "ERROR: missing .tools/docker/.env - copy .env.example and fill it in."
               exit 1
             fi
 
-            echo "==> Przebudowa kontenerow..."
+            echo "==> Rebuilding containers..."
             docker compose -f .tools/docker/docker-compose.prod.yml --env-file .tools/docker/.env up -d --build
 
-            echo "==> Oczekiwanie na aplikacje..."
+            echo "==> Waiting for the application..."
             for i in $(seq 1 40); do
               code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8120/ || echo "000")
               case "$code" in 200|301|302) break;; esac
@@ -112,13 +111,13 @@ jobs:
             echo "==> Status:"
             docker compose -f .tools/docker/docker-compose.prod.yml --env-file .tools/docker/.env ps
 
-            echo "==> Weryfikacja odpowiedzi..."
+            echo "==> Verifying the response..."
             code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8120/ || echo "000")
             echo "HTTP: $code"
             case "$code" in
               200|301|302) echo "==> Deploy zakonczony." ;;
               *)
-                echo "Aplikacja nie odpowiada poprawnie."
+                echo "The application is not responding correctly."
                 docker compose -f .tools/docker/docker-compose.prod.yml --env-file .tools/docker/.env logs --tail=60
                 exit 1
                 ;;
